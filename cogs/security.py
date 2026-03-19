@@ -86,7 +86,7 @@ class IPInfo(commands.Cog):
         await ctx.send(response)
 
     @commands.command(name="botip")
-    async def bot_ip(self, ctx):
+    async def server_ip(self, ctx):
         """يعرض الـ IP والـ location للـ bot server."""
         info = self.get_ip_info()
         if "error" in info:
