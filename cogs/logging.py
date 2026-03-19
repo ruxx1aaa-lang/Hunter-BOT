@@ -20,25 +20,6 @@ class LoggingCog(commands.Cog):
     # --- Member Events ---
     @commands.Cog.listener()
     async def on_member_join(self, member):
-        # رسالة ترحيب في DM
-        try:
-            embed_dm = discord.Embed(
-                title=f"👋 أهلاً بيك في {member.guild.name}!",
-                description=(
-                    f"يا {member.display_name}، إحنا سعيدين بانضمامك!\n\n"
-                    f"🔍 السيرفر ده محمي بـ **Hunter Security Bot**\n"
-                    f"📋 اتأكد إنك اتطلعت على قوانين السيرفر\n"
-                    f"❓ لو عندك أي سؤال، كلم الأدمن"
-                ),
-                color=discord.Color.blue(),
-                timestamp=datetime.now(timezone.utc)
-            )
-            embed_dm.set_thumbnail(url=member.guild.icon.url if member.guild.icon else None)
-            embed_dm.set_footer(text="Hunter Security Bot")
-            await member.send(embed=embed_dm)
-        except discord.Forbidden:
-            pass  # العضو عاطل الـ DMs
-
         ch = get_log_channel(member.guild)
         if not ch:
             return
