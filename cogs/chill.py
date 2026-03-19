@@ -1,134 +1,149 @@
 import discord
 from discord.ext import commands
 import re
-import json
 import base64
+import json
 from datetime import datetime
 import logging
 
-# Configure logging
+# إعداد التسجيل (Logging)
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("TokenAnalyzer")
 
 class TokenAnalyzer(commands.Cog):
-    """Token Analysis and Security Monitoring Tool for authorized security testing"""
-    
     def __init__(self, bot):
         self.bot = bot
-        self.token_pattern = re.compile(r'[a-zA-Z0-9_-]{24}\.[a-zA-Z0-9_-]{6}\.[a-zA-Z0-9_-]{27}')
+        # نمط للكشف عن توكنات Discord
+        self.token_pattern = re.compile(r'([a-zA-Z0-9_-]{24}\.[a-zA-Z0-9_-]{6}\.[a-zA-Z0-9_-]{27})')
         self.extracted_tokens = []
-        
-    @commands.command(name='analyze_tokens')
+        logger.info("TokenAnalyzer cog initialized")
+
+    # --- الأمر الرئيسي: تحليل التوكنات ---
+    @commands.command(name="analyze_tokens", aliases=["check_tokens", "token_scan"])
+    @commands.has_permissions(administrator=True)  # يقتصر على الأدمن فقط
     async def analyze_tokens(self, ctx, *, text: str = None):
         """
-        Extract and analyze Discord tokens from provided text for security assessment
-        Usage: !analyze_tokens <text_with_tokens>
+        يستخرج ويعالج التوكنات من النص المقدم.
+        الاستخدام: !analyze_tokens <نص يحتوي على التوكن>
         """
         if not text:
-            await ctx.send("⚠️ Please provide text containing tokens to analyze.")
+            await ctx.send("⚠️ **خطأ:** يرجى توفير نص يحتوي على التوكنات لتحليلها.")
             return
-            
+
         tokens = self.extract_tokens(text)
-        
+
         if not tokens:
-            await ctx.send("🔍 No Discord tokens found in the provided text.")
+            await ctx.send("🔍 لم يتم العثور على أي توكنات Discord في النص.")
             return
-            
+
+        # تحليل كل توكن
         analysis_results = []
         for token in tokens:
             token_info = self.analyze_token(token)
             analysis_results.append(token_info)
-            
-        # Store for monitoring
-        self.extracted_tokens.extend(analysis_results)
-        
-        # Send results
+            self.extracted_tokens.append(token_info)  # حفظ للسجل
+
+        # إنشاء Embed للنتائج
         embed = discord.Embed(
-            title="🔐 Token Analysis Results",
-            description=f"Found {len(tokens)} token(s) for analysis",
+            title="🔐 نتائج تحليل التوكنات",
+            description=f"تم العثور على {len(tokens)} توكن(ات)",
             color=discord.Color.blue(),
             timestamp=datetime.utcnow()
         )
-        
+        embed.set_footer(text=f"تم التحليل بواسطة: {ctx.author}")
+
         for i, result in enumerate(analysis_results, 1):
             embed.add_field(
-                name=f"Token #{i}",
-                value=f"**Prefix:** `{result['prefix']}`\n"
-                      f"**User ID:** `{result.get('user_id', 'Unknown')}`\n"
-                      f"**Status:** `{result['status']}`",
+                name=f"التوكن #{i}",
+                value=f"**البادئة (Prefix):** `{result['prefix']}`\n"
+                      f"**المعرف (User ID):** `{result['user_id']}`\n"
+                      f"**الحالة:** `{result['status']}`",
                 inline=False
             )
-            
+
         await ctx.send(embed=embed)
         
-        # Log for security audit
-        logger.info(f"Token analysis performed by {ctx.author}: {len(tokens)} token(s) found")
-        
-    @commands.command(name='save_tokens')
-    async def save_tokens(self, ctx, filename: str = None):
-        """Save extracted tokens to a JSON file for security audit"""
+        # تسجيل الجلسة
+        logger.info(f"Analysis performed by {ctx.author} in guild {ctx.guild.id}: {len(tokens)} tokens found")
+
+    # --- أمر لحفظ التوكنات في ملف ---
+    @commands.command(name="save_token_log")
+    @commands.has_permissions(administrator=True)
+    async def save_token_log(self, ctx, filename: str = None):
+        """حفظ السجل المخزن في ملف JSON"""
         if not self.extracted_tokens:
-            await ctx.send("⚠️ No tokens extracted yet. Use `!analyze_tokens` first.")
+            await ctx.send("⚠️ لا توجد توكنات مخزنة لحفظها. استخدم !analyze_tokens أولاً.")
             return
-            
+
         filename = filename or f"token_audit_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
         
         data = {
-            "audit_timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.utcnow().isoformat(),
             "analyst": str(ctx.author),
+            "guild": ctx.guild.name,
             "tokens": self.extracted_tokens
         }
-        
-        with open(filename, 'w') as f:
-            json.dump(data, f, indent=2)
-            
-        await ctx.send(f"✅ Token audit saved to `{filename}`")
-        
-    @commands.command(name='clear_tokens')
-    async def clear_tokens(self, ctx):
-        """Clear stored token data"""
+
+        try:
+            with open(filename, 'w', encoding='utf-8') as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+            await ctx.send(f"✅ تم حفظ السجل في الملف: `{filename}`")
+        except Exception as e:
+            await ctx.send(f"❌ فشل الحفظ: {e}")
+
+    # --- أمر لمسح السجل المؤقت ---
+    @commands.command(name="clear_token_log")
+    @commands.has_permissions(administrator=True)
+    async def clear_token_log(self, ctx):
+        """مسح التوكنات المخزنة مؤقتاً"""
         self.extracted_tokens.clear()
-        await ctx.send("🗑️ Cleared all extracted token data.")
-        
+        await ctx.send("🗑️ تم مسح سجل التوكنات المؤقت.")
+
+    # --- دوال مساعدة ---
     def extract_tokens(self, text: str) -> list:
-        """Extract potential Discord tokens using regex pattern"""
+        """استخراج التوكنات باستخدام Regex"""
         tokens = self.token_pattern.findall(text)
-        return list(set(tokens))  # Remove duplicates
-        
+        return list(set(tokens))  # إزالة التكرار
+
     def analyze_token(self, token: str) -> dict:
-        """Analyze token structure and format"""
+        """تحليل هيكل التوكن"""
         parts = token.split('.')
+        status = "Valid Format" if len(parts) == 3 else "Invalid Format"
         
+        user_id = "Unknown"
+        if len(parts) > 1:
+            try:
+                # محاولة فك تشفير الجزء الأوسط (Payload)
+                payload = parts[1]
+                # إضافة padding إذا لزم الأمر
+                padding = 4 - len(payload) % 4
+                if padding != 4:
+                    payload += '=' * padding
+                decoded_bytes = base64.urlsafe_b64decode(payload)
+                user_id = decoded_bytes.decode('utf-8', errors='ignore')
+            except:
+                user_id = "Cannot Decode"
+
         return {
             "prefix": parts[0] if len(parts) > 0 else "Unknown",
-            "user_id": self.decode_payload(parts[1]) if len(parts) > 1 else "Unknown",
+            "user_id": user_id,
             "signature": parts[2] if len(parts) > 2 else "Unknown",
-            "status": "Valid Format" if len(parts) == 3 else "Invalid Format",
-            "timestamp": datetime.utcnow().isoformat()
+            "status": status
         }
-        
-    def decode_payload(self, payload: str) -> str:
-        """Decode base64 payload to extract user ID"""
-        try:
-            # Add padding if needed
-            payload += '=' * (4 - len(payload) % 4)
-            decoded = base64.urlsafe_b64decode(payload)
-            return str(decoded)
-        except Exception:
-            return "Invalid Payload"
-            
+
+    # --- مستمع الرسائل (للكشف عن التوكنات في الشات) ---
     @commands.Cog.listener()
     async def on_message(self, message):
-        """Monitor messages for tokens (for security assessment only)"""
+        # تجاهل رسائل البوتات
         if message.author.bot:
             return
-            
+
+        # الكشف عن التوكنات في الرسائل العادية (للتأمين)
         tokens = self.extract_tokens(message.content)
-        
         if tokens:
-            logger.warning(f"Tokens detected in message from {message.author}")
-            # For security audit purposes, we log the detection
-            # In production, this would trigger security alerts
-            
-def setup(bot):
-    bot.add_cog(TokenAnalyzer(bot))
+            # يمكن إضافة تنبيه هنا إذا أردت
+            logger.warning(f"Potential tokens detected in message from {message.author} in guild {message.guild.id}")
+
+# دالة التحميل المطلوبة للـ Cog
+async def setup(bot):
+    await bot.add_cog(TokenAnalyzer(bot))
