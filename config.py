@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 TOKEN = os.getenv("DISCORD_TOKEN")
-PREFIX = os.getenv("PREFIX", "!")
+PREFIX = os.getenv("PREFIX", "!hunter ")
 LOG_CHANNEL_ID = int(os.getenv("LOG_CHANNEL_ID", 0))
 
 # Anti-Spam settings
