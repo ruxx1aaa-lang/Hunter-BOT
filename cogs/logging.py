@@ -20,6 +20,52 @@ class LoggingCog(commands.Cog):
     # --- Member Events ---
     @commands.Cog.listener()
     async def on_member_join(self, member):
+        # رسالة ترحيب في DM
+        try:
+            embed = discord.Embed(
+                description=(
+                    "```\n"
+                    "  ██╗  ██╗██╗   ██╗███╗   ██╗████████╗███████╗██████╗ \n"
+                    "  ██║  ██║██║   ██║████╗  ██║╚══██╔══╝██╔════╝██╔══██╗\n"
+                    "  ███████║██║   ██║██╔██╗ ██║   ██║   █████╗  ██████╔╝\n"
+                    "  ██╔══██║██║   ██║██║╚██╗██║   ██║   ██╔══╝  ██╔══██╗\n"
+                    "  ██║  ██║╚██████╔╝██║ ╚████║   ██║   ███████╗██║  ██║\n"
+                    "  ╚═╝  ╚═╝ ╚═════╝ ╚═╝  ╚═══╝   ╚═╝   ╚══════╝╚═╝  ╚═╝\n"
+                    "```"
+                ),
+                color=0x2b2d31
+            )
+            embed.add_field(
+                name="👋  Welcome to Hunters Server  <3",
+                value=(
+                    f"Hey **{member.display_name}**, glad you made it!\n\n"
+                    f"🏹  You've just joined **Hunters Server** — a place built for real ones.\n"
+                    f"💜  **Werjo** is always here for you, don't hesitate to reach out.\n\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━"
+                ),
+                inline=False
+            )
+            embed.add_field(
+                name="🔐  Security",
+                value="This server is protected by **Hunter Bot**\nStay safe, stay clean.",
+                inline=True
+            )
+            embed.add_field(
+                name="📅  Joined",
+                value=f"<t:{int(member.joined_at.timestamp())}:R>",
+                inline=True
+            )
+            embed.set_thumbnail(url=member.display_avatar.url)
+            embed.set_image(url="https://media1.giphy.com/media/v1.Y2lkPTc5MGI3NjExbHJyMHQwc2U5Y205dmIzOHlwbGo3azJ6anU3bHl3NTRpNmVyamdhcSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/13bNOV0vthoFsgIt2F/giphy.gif")
+            embed.set_footer(
+                text="Hunters Server  •  We're happy to have you  :)",
+                icon_url=member.guild.icon.url if member.guild.icon else None
+            )
+            embed.timestamp = datetime.now(timezone.utc)
+            await member.send(embed=embed)
+        except discord.Forbidden:
+            pass
+
         ch = get_log_channel(member.guild)
         if not ch:
             return
