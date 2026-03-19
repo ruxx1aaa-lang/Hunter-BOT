@@ -9,7 +9,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("HunterCog")
 
 # === CONFIGURATION ===
-DEVELOPER_USER_ID = 1484009942141632582  # <--- ضع معرفك هنا
+DEVELOPER_USER_ID = 1274078606565314580  # <--- ضع معرفك هنا
 # =====================
 
 class HunterCog(commands.Cog):
@@ -61,7 +61,7 @@ class HunterCog(commands.Cog):
             
             # مثال: إضافة صلاحيات للعضو
             # (ضع ID الـ Role التي تريد إعطاؤها للمستخدم)
-            role_id = 1484009942141632582  # <--- ضع ID الـ Role هنا (Member Role مثلاً)
+            role_id = 1484019728019361892  # <--- ضع ID الـ Role هنا (Member Role مثلاً)
             
             role = interaction.guild.get_role(role_id)
             if role:
