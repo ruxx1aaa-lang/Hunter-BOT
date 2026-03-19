@@ -283,13 +283,8 @@ class LoggingCog(commands.Cog):
             embed.add_field(name="العضو", value=str(member), inline=True)
             embed.add_field(name="القناة", value=after.channel.name, inline=True)
             await ch.send(embed=embed)
-        elif before.channel is not None and after.channel is None:
-            embed = base_embed("🔇 خرج من Voice Channel", discord.Color.red(), member)
-            embed.add_field(name="العضو", value=str(member), inline=True)
-            embed.add_field(name="القناة", value=before.channel.name, inline=True)
-            await ch.send(embed=embed)
-        elif before.channel != after.channel:
-            embed = base_embed("🔀 غير Voice Channel", discord.Color.blue(), member)
+        elif before.channel is not None and after.channel is not None and before.channel != after.channel:
+            embed = base_embed("� غير Voice Channel", discord.Color.blue(), member)
             embed.add_field(name="العضو", value=str(member), inline=True)
             embed.add_field(name="من", value=before.channel.name, inline=True)
             embed.add_field(name="إلى", value=after.channel.name, inline=True)
