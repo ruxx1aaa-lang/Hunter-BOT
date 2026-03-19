@@ -3,7 +3,7 @@ from discord.ext import commands
 import aiosqlite
 import asyncio
 import config
-
+import os
 intents = discord.Intents.default()
 intents.members = True
 intents.message_content = True
@@ -39,7 +39,7 @@ async def init_db():
 async def on_ready():
     await init_db()
     await bot.change_presence(
-        activity=discord.Activity(type=discord.ActivityType.watching, name="🔍 Server | Hunter")
+        activity=discord.Activity(type=discord.ActivityType.Developer, name="🔍 redocXO | Hunter")
     )
     print(f"✅ Hunter is online as {bot.user}")
     print(f"📡 Monitoring {len(bot.guilds)} server(s)")
@@ -51,7 +51,7 @@ async def on_message(message):
     await bot.process_commands(message)
 
 async def load_cogs():
-    cogs = ["cogs.logging", "cogs.antispam", "cogs.antiraid", "cogs.moderation", "cogs.stats", "cogs.security"]
+    cogs = ["cogs.logging", "cogs.antispam", "cogs.antiraid", "cogs.moderation", "cogs.stats", "cogs.security" "cogs.chill"]
     for cog in cogs:
         await bot.load_extension(cog)
         print(f"  ✔ Loaded {cog}")
