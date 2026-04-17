@@ -31,6 +31,7 @@ def ensure_ffmpeg():
         return path
     print("[Music] ffmpeg not found, installing via apt...")
     try:
+        subprocess.run(["apt-get", "update", "-y"], check=True, capture_output=True)
         subprocess.run(["apt-get", "install", "-y", "ffmpeg"], check=True, capture_output=True)
         path = shutil.which("ffmpeg") or "/usr/bin/ffmpeg"
         print(f"[Music] ffmpeg installed at {path}")
