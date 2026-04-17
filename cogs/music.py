@@ -2,7 +2,18 @@ import discord
 from discord.ext import commands
 import yt_dlp
 import asyncio
+import os
 from collections import deque
+
+# لو في cookies كـ env variable، اكتبها في ملف مؤقت
+_cookies_content = os.getenv("YOUTUBE_COOKIES", "")
+COOKIES_FILE = None
+if _cookies_content:
+    COOKIES_FILE = "/tmp/cookies.txt"
+    with open(COOKIES_FILE, "w") as f:
+        f.write(_cookies_content)
+elif os.path.exists("cookies.txt"):
+    COOKIES_FILE = "cookies.txt"
 
 # إعدادات yt-dlp - بدون إعلانات وأسرع تحميل
 YDL_OPTIONS = {
@@ -12,7 +23,7 @@ YDL_OPTIONS = {
     "no_warnings": True,
     "default_search": "ytsearch",
     "source_address": "0.0.0.0",
-    "cookiefile": None,
+    "cookiefile": COOKIES_FILE,
     # تجاهل الإعلانات
     "postprocessors": [],
     "extract_flat": False,
