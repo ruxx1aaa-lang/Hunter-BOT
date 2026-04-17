@@ -25,7 +25,7 @@ elif os.path.exists("cookies.txt"):
 
 # إعدادات yt-dlp - بدون إعلانات وأسرع تحميل
 YDL_OPTIONS = {
-    "format": "bestaudio[ext=webm]/bestaudio[ext=m4a]/bestaudio/best",
+    "format": "worstaudio/worst/best",
     "noplaylist": False,
     "quiet": True,
     "no_warnings": True,
@@ -34,6 +34,7 @@ YDL_OPTIONS = {
     "cookiefile": COOKIES_FILE,
     "postprocessors": [],
     "extract_flat": False,
+    "geo_bypass": True,
 }
 
 # إعدادات FFmpeg - بدون تأخير
@@ -61,18 +62,31 @@ class MusicCog(commands.Cog, name="Music"):
         loop = asyncio.get_event_loop()
 
         def _extract():
-            with yt_dlp.YoutubeDL(YDL_OPTIONS) as ydl:
-                # لو مش رابط، يدور على يوتيوب
-                if not query.startswith("http"):
-                    info = ydl.extract_info(f"ytsearch:{query}", download=False)
-                    if info and "entries" in info and info["entries"]:
-                        info = info["entries"][0]
-                else:
-                    info = ydl.extract_info(query, download=False)
-                    # لو playlist، ياخد أول أغنية
-                    if "entries" in info:
-                        info = info["entries"][0]
-                return info
+            opts = YDL_OPTIONS.copy()
+            with yt_dlp.YoutubeDL(opts) as ydl:
+                try:
+                    # لو مش رابط، يدور على يوتيوب
+                    if not query.startswith("http"):
+                        info = ydl.extract_info(f"ytsearch5:{query}", download=False)
+                        if info and "entries" in info:
+                            # جرب أول فيديو متاح
+                            for entry in info["entries"]:
+                                if entry:
+                                    try:
+                                        full = ydl.extract_info(entry["url"] if "url" in entry else f"https://www.youtube.com/watch?v={entry['id']}", download=False)
+                                        if full and full.get("url"):
+                                            return full
+                                    except Exception:
+                                        continue
+                    else:
+                        info = ydl.extract_info(query, download=False)
+                        if "entries" in info:
+                            info = info["entries"][0]
+                        return info
+                except Exception as e:
+                    print(f"[Music] Extract error: {e}")
+                    return None
+            return None
 
         try:
             info = await loop.run_in_executor(None, _extract)
