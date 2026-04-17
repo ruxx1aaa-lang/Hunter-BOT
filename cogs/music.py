@@ -9,12 +9,20 @@ class MusicCog(commands.Cog, name="Music"):
         self.bot = bot
 
     async def cog_load(self):
-        node = wavelink.Node(
-            uri="https://lavalink.devamop.in",
-            password="DevamOP",
-        )
-        await wavelink.Pool.connect(nodes=[node], client=self.bot, cache_capacity=100)
-        print("[Music] Connected to Lavalink node")
+        nodes = [
+            wavelink.Node(uri="https://lavalink.devamop.in", password="DevamOP"),
+            wavelink.Node(uri="https://lavalink.oops.wtf", password="www.lavalink.oops.wtf"),
+            wavelink.Node(uri="https://lava.link", password="dismusic"),
+        ]
+        for node in nodes:
+            try:
+                await wavelink.Pool.connect(nodes=[node], client=self.bot, cache_capacity=100)
+                print(f"[Music] Connected to {node.uri}")
+                return
+            except Exception as e:
+                print(f"[Music] Failed to connect to {node.uri}: {e}")
+                continue
+        print("[Music] WARNING: Could not connect to any Lavalink node!")
 
     @commands.Cog.listener()
     async def on_wavelink_node_ready(self, payload: wavelink.NodeReadyEventPayload):
