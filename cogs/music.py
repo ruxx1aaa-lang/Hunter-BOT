@@ -25,14 +25,13 @@ elif os.path.exists("cookies.txt"):
 
 # إعدادات yt-dlp - بدون إعلانات وأسرع تحميل
 YDL_OPTIONS = {
-    "format": "bestaudio/best",
+    "format": "bestaudio[ext=webm]/bestaudio[ext=m4a]/bestaudio/best",
     "noplaylist": False,
     "quiet": True,
     "no_warnings": True,
     "default_search": "ytsearch",
     "source_address": "0.0.0.0",
     "cookiefile": COOKIES_FILE,
-    # تجاهل الإعلانات
     "postprocessors": [],
     "extract_flat": False,
 }
