@@ -1,5 +1,5 @@
 [phases.setup]
-nixPkgs = ["ffmpeg", "libsodium", "libopus"]
+aptPkgs = ["ffmpeg", "libsodium-dev", "libopus-dev"]
 
 [phases.install]
 cmds = ["pip install --upgrade pip", "pip install -r requirements.txt"]
