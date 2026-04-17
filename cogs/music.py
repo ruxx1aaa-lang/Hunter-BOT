@@ -1,235 +1,320 @@
 import discord
 from discord.ext import commands
-import wavelink
+import yt_dlp
 import asyncio
+import os
+import base64
+from collections import deque
+
+# ─── Cookies ───────────────────────────────────────────────────────────────
+_cookies_content = os.getenv("YOUTUBE_COOKIES", "")
+COOKIES_FILE = None
+if _cookies_content:
+    COOKIES_FILE = "/tmp/cookies.txt"
+    try:
+        decoded = base64.b64decode(_cookies_content).decode("utf-8")
+        with open(COOKIES_FILE, "w") as f:
+            f.write(decoded)
+    except Exception:
+        with open(COOKIES_FILE, "w") as f:
+            f.write(_cookies_content)
+elif os.path.exists("cookies.txt"):
+    COOKIES_FILE = "cookies.txt"
+
+# ─── yt-dlp options ────────────────────────────────────────────────────────
+YDL_OPTIONS = {
+    "format": "bestaudio/best",
+    "quiet": True,
+    "no_warnings": True,
+    "default_search": "ytsearch",
+    "source_address": "0.0.0.0",
+    "cookiefile": COOKIES_FILE,
+    "extract_flat": False,
+    "geo_bypass": True,
+    # يستخدم web_creator client اللي بيتجاوز الـ restrictions
+    "extractor_args": {
+        "youtube": {
+            "player_client": ["web_creator", "android", "web"],
+        }
+    },
+}
+
+FFMPEG_OPTIONS = {
+    "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
+    "options": "-vn -bufsize 512k",
+}
 
 
 class MusicCog(commands.Cog, name="Music"):
     def __init__(self, bot):
         self.bot = bot
+        self.queues: dict[int, deque] = {}
+        self.current: dict[int, dict] = {}
+        self.loop_mode: dict[int, bool] = {}
 
-    async def cog_load(self):
-        nodes = [
-            wavelink.Node(uri="https://lavalink.devamop.in", password="DevamOP"),
-            wavelink.Node(uri="https://lavalink.oops.wtf", password="www.lavalink.oops.wtf"),
-            wavelink.Node(uri="https://lava.link", password="dismusic"),
-        ]
-        for node in nodes:
-            try:
-                await wavelink.Pool.connect(nodes=[node], client=self.bot, cache_capacity=100)
-                print(f"[Music] Connected to {node.uri}")
-                return
-            except Exception as e:
-                print(f"[Music] Failed to connect to {node.uri}: {e}")
-                continue
-        print("[Music] WARNING: Could not connect to any Lavalink node!")
+    def get_queue(self, guild_id: int) -> deque:
+        if guild_id not in self.queues:
+            self.queues[guild_id] = deque()
+        return self.queues[guild_id]
 
-    @commands.Cog.listener()
-    async def on_wavelink_node_ready(self, payload: wavelink.NodeReadyEventPayload):
-        print(f"[Music] Node {payload.node.identifier} is ready!")
+    async def search_and_extract(self, query: str) -> dict | None:
+        loop = asyncio.get_event_loop()
 
-    @commands.Cog.listener()
-    async def on_wavelink_track_start(self, payload: wavelink.TrackStartEventPayload):
-        player: wavelink.Player = payload.player
-        if not player or not hasattr(player, "ctx"):
-            return
-        track = payload.track
-        embed = discord.Embed(
-            title="🎵 بيشتغل دلوقتي",
-            description=f"**[{track.title}]({track.uri})**",
-            color=discord.Color.green(),
-        )
-        embed.add_field(name="👤 الفنان", value=track.author or "Unknown")
-        embed.add_field(name="⏱ المدة", value=self._fmt(track.length))
-        if hasattr(track, "artwork") and track.artwork:
-            embed.set_thumbnail(url=track.artwork)
-        await player.ctx.send(embed=embed)
+        def _extract():
+            with yt_dlp.YoutubeDL(YDL_OPTIONS) as ydl:
+                if not query.startswith("http"):
+                    info = ydl.extract_info(f"ytsearch:{query}", download=False)
+                    if info and "entries" in info and info["entries"]:
+                        info = info["entries"][0]
+                else:
+                    info = ydl.extract_info(query, download=False)
+                    if info and "entries" in info:
+                        info = info["entries"][0]
 
-    @commands.Cog.listener()
-    async def on_wavelink_track_end(self, payload: wavelink.TrackEndEventPayload):
-        player: wavelink.Player = payload.player
-        if not player:
-            return
-        if player.queue.is_empty:
-            if hasattr(player, "ctx"):
-                await player.ctx.send("✅ خلصت الـ queue.")
-        else:
-            await player.play(player.queue.get())
+                if not info:
+                    return None
 
-    def _fmt(self, ms: int) -> str:
-        s = ms // 1000
-        m, s = divmod(s, 60)
+                # جيب أفضل audio URL
+                url = None
+                formats = info.get("formats", [])
+                # دور على audio-only format
+                for f in reversed(formats):
+                    if f.get("acodec") != "none" and f.get("vcodec") == "none":
+                        url = f.get("url")
+                        break
+                # لو مش لاقي audio-only، خد أي format
+                if not url:
+                    url = info.get("url")
+                if not url and formats:
+                    url = formats[-1].get("url")
+
+                return {
+                    "url": url,
+                    "title": info.get("title", "Unknown"),
+                    "duration": info.get("duration", 0),
+                    "webpage_url": info.get("webpage_url", ""),
+                    "thumbnail": info.get("thumbnail", ""),
+                    "uploader": info.get("uploader", "Unknown"),
+                }
+
+        try:
+            return await loop.run_in_executor(None, _extract)
+        except Exception as e:
+            print(f"[Music] Error: {e}")
+            return None
+
+    def fmt(self, s: int) -> str:
+        if not s:
+            return "Live 🔴"
+        m, s = divmod(int(s), 60)
         h, m = divmod(m, 60)
-        if h:
-            return f"{h}:{m:02d}:{s:02d}"
-        return f"{m}:{s:02d}"
+        return f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
 
-    # ─────────────────────────────────────────
-    # Commands
-    # ─────────────────────────────────────────
+    async def play_next(self, ctx: commands.Context):
+        guild_id = ctx.guild.id
+        queue = self.get_queue(guild_id)
+        vc = ctx.voice_client
+
+        if not vc or not vc.is_connected():
+            return
+
+        if self.loop_mode.get(guild_id) and guild_id in self.current:
+            track = self.current[guild_id]
+        elif queue:
+            track = queue.popleft()
+            self.current[guild_id] = track
+        else:
+            self.current.pop(guild_id, None)
+            await ctx.send("✅ خلصت الـ queue.")
+            return
+
+        def after(error):
+            if error:
+                print(f"[Music] Player error: {error}")
+            asyncio.run_coroutine_threadsafe(self.play_next(ctx), self.bot.loop)
+
+        try:
+            source = discord.FFmpegPCMAudio(track["url"], **FFMPEG_OPTIONS)
+            source = discord.PCMVolumeTransformer(source, volume=0.8)
+            vc.play(source, after=after)
+
+            embed = discord.Embed(
+                title="🎵 بيشتغل دلوقتي",
+                description=f"**[{track['title']}]({track['webpage_url']})**",
+                color=discord.Color.green(),
+            )
+            embed.add_field(name="⏱ المدة", value=self.fmt(track["duration"]))
+            embed.add_field(name="👤 القناة", value=track["uploader"])
+            if track["thumbnail"]:
+                embed.set_thumbnail(url=track["thumbnail"])
+            embed.set_footer(text=f"Queue: {len(queue)} أغنية متبقية")
+            await ctx.send(embed=embed)
+        except Exception as e:
+            print(f"[Music] Playback error: {e}")
+            await ctx.send(f"❌ خطأ في التشغيل: `{e}`")
+            await self.play_next(ctx)
+
+    # ─── Commands ──────────────────────────────────────────────────────────
 
     @commands.command(name="p", aliases=["play", "شغل"])
     async def play(self, ctx: commands.Context, *, query: str):
-        """يشغل أغنية | !p <اسم أو رابط>"""
         if not ctx.author.voice:
             return await ctx.send("❌ لازم تكون في فويس شانل الأول!")
 
         channel = ctx.author.voice.channel
-        player: wavelink.Player = ctx.voice_client
+        vc = ctx.voice_client
 
-        if not player:
-            player = await channel.connect(cls=wavelink.Player)
-        elif player.channel != channel:
-            await player.move_to(channel)
-
-        player.ctx = ctx
-        player.autoplay = wavelink.AutoPlayMode.disabled
+        if not vc:
+            vc = await channel.connect()
+        elif vc.channel != channel:
+            await vc.move_to(channel)
 
         loading = await ctx.send("🔍 بدور على الأغنية...")
-
-        try:
-            tracks = await wavelink.Playable.search(query)
-        except Exception as e:
-            await loading.delete()
-            return await ctx.send(f"❌ حصل خطأ: `{e}`")
-
+        track = await self.search_and_extract(query)
         await loading.delete()
 
-        if not tracks:
-            return await ctx.send("❌ مش لاقي الأغنية دي.")
+        if not track or not track.get("url"):
+            return await ctx.send("❌ مش لاقي الأغنية دي، جرب اسم تاني.")
 
-        track = tracks[0]
+        queue = self.get_queue(ctx.guild.id)
 
-        if player.playing:
-            player.queue.put(track)
+        if not vc.is_playing() and not vc.is_paused():
+            self.current[ctx.guild.id] = track
+
+            def after(error):
+                if error:
+                    print(f"[Music] Player error: {error}")
+                asyncio.run_coroutine_threadsafe(self.play_next(ctx), self.bot.loop)
+
+            source = discord.FFmpegPCMAudio(track["url"], **FFMPEG_OPTIONS)
+            source = discord.PCMVolumeTransformer(source, volume=0.8)
+            vc.play(source, after=after)
+
+            embed = discord.Embed(
+                title="🎵 بيشتغل دلوقتي",
+                description=f"**[{track['title']}]({track['webpage_url']})**",
+                color=discord.Color.green(),
+            )
+            embed.add_field(name="⏱ المدة", value=self.fmt(track["duration"]))
+            embed.add_field(name="👤 القناة", value=track["uploader"])
+            if track["thumbnail"]:
+                embed.set_thumbnail(url=track["thumbnail"])
+            await ctx.send(embed=embed)
+        else:
+            queue.append(track)
             embed = discord.Embed(
                 title="➕ اتضافت للـ Queue",
-                description=f"**[{track.title}]({track.uri})**",
+                description=f"**[{track['title']}]({track['webpage_url']})**",
                 color=discord.Color.blue(),
             )
-            embed.add_field(name="⏱ المدة", value=self._fmt(track.length))
-            embed.add_field(name="📋 موقعها", value=f"#{player.queue.count}")
-            return await ctx.send(embed=embed)
-
-        await player.play(track)
+            embed.add_field(name="⏱ المدة", value=self.fmt(track["duration"]))
+            embed.add_field(name="📋 موقعها", value=f"#{len(queue)}")
+            await ctx.send(embed=embed)
 
     @commands.command(name="skip", aliases=["s", "سكيب"])
-    async def skip(self, ctx: commands.Context):
-        """يسكيب الأغنية الحالية"""
-        player: wavelink.Player = ctx.voice_client
-        if not player or not player.playing:
+    async def skip(self, ctx):
+        vc = ctx.voice_client
+        if not vc or not vc.is_playing():
             return await ctx.send("❌ مفيش حاجة بتشتغل.")
-        await player.skip()
+        vc.stop()
         await ctx.send("⏭ تم السكيب!")
 
     @commands.command(name="stop", aliases=["وقف"])
-    async def stop(self, ctx: commands.Context):
-        """يوقف الموسيقى ويمسح الـ queue"""
-        player: wavelink.Player = ctx.voice_client
-        if not player:
+    async def stop(self, ctx):
+        vc = ctx.voice_client
+        if not vc:
             return await ctx.send("❌ البوت مش في فويس شانل.")
-        player.queue.clear()
-        await player.stop()
+        self.queues[ctx.guild.id] = deque()
+        self.current.pop(ctx.guild.id, None)
+        self.loop_mode[ctx.guild.id] = False
+        vc.stop()
         await ctx.send("⏹ تم إيقاف الموسيقى.")
 
     @commands.command(name="pause", aliases=["بوز"])
-    async def pause(self, ctx: commands.Context):
-        """يوقف الأغنية مؤقتاً"""
-        player: wavelink.Player = ctx.voice_client
-        if player and player.playing:
-            await player.pause(True)
+    async def pause(self, ctx):
+        vc = ctx.voice_client
+        if vc and vc.is_playing():
+            vc.pause()
             await ctx.send("⏸ تم الإيقاف المؤقت.")
         else:
             await ctx.send("❌ مفيش حاجة بتشتغل.")
 
     @commands.command(name="resume", aliases=["r", "كمل"])
-    async def resume(self, ctx: commands.Context):
-        """يكمل الأغنية"""
-        player: wavelink.Player = ctx.voice_client
-        if player and player.paused:
-            await player.pause(False)
+    async def resume(self, ctx):
+        vc = ctx.voice_client
+        if vc and vc.is_paused():
+            vc.resume()
             await ctx.send("▶️ تم الاستكمال.")
         else:
             await ctx.send("❌ الأغنية مش متوقفة.")
 
     @commands.command(name="queue", aliases=["q", "قائمة"])
-    async def show_queue(self, ctx: commands.Context):
-        """يعرض الـ queue"""
-        player: wavelink.Player = ctx.voice_client
-        if not player:
+    async def show_queue(self, ctx):
+        queue = self.get_queue(ctx.guild.id)
+        current = self.current.get(ctx.guild.id)
+        if not current and not queue:
             return await ctx.send("📭 الـ queue فاضي.")
-
         embed = discord.Embed(title="🎶 قائمة الأغاني", color=discord.Color.purple())
-
-        if player.current:
-            embed.add_field(
-                name="▶️ بيشتغل دلوقتي",
-                value=f"**{player.current.title}** ({self._fmt(player.current.length)})",
-                inline=False,
-            )
-
-        if not player.queue.is_empty:
-            tracks_list = []
-            for i, t in enumerate(list(player.queue)[:10], 1):
-                tracks_list.append(f"`{i}.` {t.title} ({self._fmt(t.length)})")
-            if player.queue.count > 10:
-                tracks_list.append(f"... و {player.queue.count - 10} أغنية تانية")
-            embed.add_field(name="📋 القادم", value="\n".join(tracks_list), inline=False)
-
-        if not player.current and player.queue.is_empty:
-            return await ctx.send("📭 الـ queue فاضي.")
-
+        if current:
+            embed.add_field(name="▶️ بيشتغل دلوقتي",
+                value=f"**{current['title']}** ({self.fmt(current['duration'])})", inline=False)
+        if queue:
+            lines = [f"`{i}.` {t['title']} ({self.fmt(t['duration'])})"
+                     for i, t in enumerate(list(queue)[:10], 1)]
+            if len(queue) > 10:
+                lines.append(f"... و {len(queue)-10} أغنية تانية")
+            embed.add_field(name="📋 القادم", value="\n".join(lines), inline=False)
         await ctx.send(embed=embed)
 
+    @commands.command(name="loop", aliases=["لوب"])
+    async def loop(self, ctx):
+        self.loop_mode[ctx.guild.id] = not self.loop_mode.get(ctx.guild.id, False)
+        await ctx.send("🔂 تكرار شغال" if self.loop_mode[ctx.guild.id] else "➡️ تكرار وقف")
+
     @commands.command(name="volume", aliases=["vol", "صوت"])
-    async def volume(self, ctx: commands.Context, vol: int):
-        """يغير الصوت (1-100)"""
-        player: wavelink.Player = ctx.voice_client
-        if not player:
+    async def volume(self, ctx, vol: int):
+        vc = ctx.voice_client
+        if not vc or not vc.source:
             return await ctx.send("❌ مفيش حاجة بتشتغل.")
         if not 1 <= vol <= 100:
-            return await ctx.send("❌ الصوت لازم يكون بين 1 و 100.")
-        await player.set_volume(vol)
-        await ctx.send(f"🔊 الصوت اتغير لـ {vol}%")
+            return await ctx.send("❌ الصوت بين 1 و 100.")
+        vc.source.volume = vol / 100
+        await ctx.send(f"🔊 الصوت {vol}%")
 
     @commands.command(name="np", aliases=["nowplaying", "شغال"])
-    async def nowplaying(self, ctx: commands.Context):
-        """يعرض الأغنية الحالية"""
-        player: wavelink.Player = ctx.voice_client
-        if not player or not player.current:
+    async def nowplaying(self, ctx):
+        current = self.current.get(ctx.guild.id)
+        if not current:
             return await ctx.send("❌ مفيش حاجة بتشتغل.")
-        t = player.current
         embed = discord.Embed(
             title="🎵 بيشتغل دلوقتي",
-            description=f"**[{t.title}]({t.uri})**",
+            description=f"**[{current['title']}]({current['webpage_url']})**",
             color=discord.Color.green(),
         )
-        embed.add_field(name="👤 الفنان", value=t.author or "Unknown")
-        embed.add_field(name="⏱ المدة", value=self._fmt(t.length))
-        if hasattr(t, "artwork") and t.artwork:
-            embed.set_thumbnail(url=t.artwork)
+        embed.add_field(name="⏱ المدة", value=self.fmt(current["duration"]))
+        if current["thumbnail"]:
+            embed.set_thumbnail(url=current["thumbnail"])
         await ctx.send(embed=embed)
 
     @commands.command(name="join", aliases=["انضم"])
-    async def join(self, ctx: commands.Context):
-        """يدخل الفويس شانل"""
+    async def join(self, ctx):
         if not ctx.author.voice:
             return await ctx.send("❌ لازم تكون في فويس شانل الأول!")
         channel = ctx.author.voice.channel
         if ctx.voice_client:
             await ctx.voice_client.move_to(channel)
         else:
-            player = await channel.connect(cls=wavelink.Player)
-            player.ctx = ctx
+            await channel.connect()
         await ctx.send(f"✅ اتضمت لـ **{channel.name}**")
 
     @commands.command(name="leave", aliases=["dc", "امشي"])
-    async def leave(self, ctx: commands.Context):
-        """يخرج من الفويس شانل"""
-        player: wavelink.Player = ctx.voice_client
-        if not player:
+    async def leave(self, ctx):
+        vc = ctx.voice_client
+        if not vc:
             return await ctx.send("❌ البوت مش في فويس شانل.")
-        await player.disconnect()
+        self.queues[ctx.guild.id] = deque()
+        self.current.pop(ctx.guild.id, None)
+        await vc.disconnect()
         await ctx.send("👋 خرجت من الفويس شانل.")
 
 
