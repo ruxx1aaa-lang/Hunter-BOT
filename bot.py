@@ -53,7 +53,16 @@ async def on_ready():
 async def on_message(message):
     if message.author.bot:
         return
+    print(f"[MSG] {message.author}: {message.content[:50]}")
     await bot.process_commands(message)
+
+@bot.event
+async def on_command_error(ctx, error):
+    print(f"[CMD ERROR] {ctx.command} | {error}")
+
+@bot.event
+async def on_command(ctx):
+    print(f"[CMD] {ctx.author} used: {ctx.message.content[:50]}")
 
 async def load_cogs():
     cogs = ["cogs.logging", "cogs.antispam", "cogs.antiraid", "cogs.moderation", "cogs.stats", "cogs.music"]
