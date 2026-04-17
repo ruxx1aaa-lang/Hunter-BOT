@@ -26,17 +26,9 @@ YDL_OPTIONS = {
     "format": "bestaudio/best",
     "quiet": True,
     "no_warnings": True,
-    "default_search": "ytsearch",
+    "default_search": "scsearch",  # SoundCloud بدل YouTube
     "source_address": "0.0.0.0",
-    "cookiefile": COOKIES_FILE,
     "extract_flat": False,
-    "geo_bypass": True,
-    # يستخدم web_creator client اللي بيتجاوز الـ restrictions
-    "extractor_args": {
-        "youtube": {
-            "player_client": ["web_creator", "android", "web"],
-        }
-    },
 }
 
 FFMPEG_OPTIONS = {
@@ -62,27 +54,33 @@ class MusicCog(commands.Cog, name="Music"):
 
         def _extract():
             with yt_dlp.YoutubeDL(YDL_OPTIONS) as ydl:
-                if not query.startswith("http"):
-                    info = ydl.extract_info(f"ytsearch:{query}", download=False)
-                    if info and "entries" in info and info["entries"]:
-                        info = info["entries"][0]
+                # لو YouTube link، نجرب YouTube
+                if "youtube.com" in query or "youtu.be" in query:
+                    opts = YDL_OPTIONS.copy()
+                    opts["cookiefile"] = COOKIES_FILE
+                    opts["extractor_args"] = {"youtube": {"player_client": ["android", "web_creator"]}}
+                    with yt_dlp.YoutubeDL(opts) as ydl2:
+                        info = ydl2.extract_info(query, download=False)
                 else:
-                    info = ydl.extract_info(query, download=False)
-                    if info and "entries" in info:
-                        info = info["entries"][0]
+                    # SoundCloud search
+                    if not query.startswith("http"):
+                        info = ydl.extract_info(f"scsearch:{query}", download=False)
+                        if info and "entries" in info and info["entries"]:
+                            info = info["entries"][0]
+                    else:
+                        info = ydl.extract_info(query, download=False)
+                        if info and "entries" in info:
+                            info = info["entries"][0]
 
                 if not info:
                     return None
 
-                # جيب أفضل audio URL
                 url = None
                 formats = info.get("formats", [])
-                # دور على audio-only format
                 for f in reversed(formats):
                     if f.get("acodec") != "none" and f.get("vcodec") == "none":
                         url = f.get("url")
                         break
-                # لو مش لاقي audio-only، خد أي format
                 if not url:
                     url = info.get("url")
                 if not url and formats:
