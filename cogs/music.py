@@ -96,7 +96,9 @@ class MusicCog(commands.Cog, name="Music"):
                 }
 
         try:
-            return await loop.run_in_executor(None, _extract)
+            result = await loop.run_in_executor(None, _extract)
+            print(f"[Music] Extract result: title={result.get('title') if result else None}, url={'OK' if result and result.get('url') else 'NONE'}")
+            return result
         except Exception as e:
             print(f"[Music] Error: {e}")
             return None
@@ -172,6 +174,7 @@ class MusicCog(commands.Cog, name="Music"):
         await loading.delete()
 
         if not track or not track.get("url"):
+            print(f"[Music] No track found for: {query} | track={track}")
             return await ctx.send("❌ مش لاقي الأغنية دي، جرب اسم تاني.")
 
         queue = self.get_queue(ctx.guild.id)
