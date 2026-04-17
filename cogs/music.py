@@ -24,23 +24,23 @@ elif os.path.exists("cookies.txt"):
 
 import subprocess
 
-# ─── FFmpeg path ───────────────────────────────────────────────────────────
-FFMPEG_PATH = shutil.which("ffmpeg") or shutil.which("ffmpeg-nix")
-if not FFMPEG_PATH:
-    # دور على ffmpeg في كل المسارات الممكنة
-    for path in ["/usr/bin/ffmpeg", "/usr/local/bin/ffmpeg", "/nix/var/nix/profiles/default/bin/ffmpeg", "/run/current-system/sw/bin/ffmpeg"]:
-        if os.path.isfile(path):
-            FFMPEG_PATH = path
-            break
-if not FFMPEG_PATH:
+# ─── Install ffmpeg if not found ───────────────────────────────────────────
+def ensure_ffmpeg():
+    path = shutil.which("ffmpeg")
+    if path:
+        return path
+    print("[Music] ffmpeg not found, installing via apt...")
     try:
-        result = subprocess.run(["find", "/", "-name", "ffmpeg", "-type", "f"], capture_output=True, text=True, timeout=5)
-        lines = result.stdout.strip().split("\n")
-        if lines and lines[0]:
-            FFMPEG_PATH = lines[0]
-    except Exception:
-        pass
-FFMPEG_PATH = FFMPEG_PATH or "ffmpeg"
+        subprocess.run(["apt-get", "install", "-y", "ffmpeg"], check=True, capture_output=True)
+        path = shutil.which("ffmpeg") or "/usr/bin/ffmpeg"
+        print(f"[Music] ffmpeg installed at {path}")
+        return path
+    except Exception as e:
+        print(f"[Music] apt install failed: {e}")
+    return "ffmpeg"
+
+# ─── FFmpeg path ───────────────────────────────────────────────────────────
+FFMPEG_PATH = ensure_ffmpeg()
 print(f"[Music] FFmpeg path: {FFMPEG_PATH}")
 
 # ─── yt-dlp options ────────────────────────────────────────────────────────
