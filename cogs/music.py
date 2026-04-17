@@ -3,6 +3,7 @@ from discord.ext import commands
 import yt_dlp
 import asyncio
 import os
+import shutil
 from collections import deque
 
 # لو في cookies كـ env variable، اكتبها في ملف مؤقت
@@ -12,16 +13,18 @@ if _cookies_content:
     COOKIES_FILE = "/tmp/cookies.txt"
     import base64
     try:
-        # جرب base64 أول
         decoded = base64.b64decode(_cookies_content).decode("utf-8")
         with open(COOKIES_FILE, "w") as f:
             f.write(decoded)
     except Exception:
-        # لو مش base64، اكتبه مباشرة
         with open(COOKIES_FILE, "w") as f:
             f.write(_cookies_content)
 elif os.path.exists("cookies.txt"):
     COOKIES_FILE = "cookies.txt"
+
+# ابحث عن node binary
+NODE_PATH = shutil.which("node") or shutil.which("nodejs") or "/usr/bin/node"
+print(f"[Music] Node path: {NODE_PATH}")
 
 # إعدادات yt-dlp - بدون إعلانات وأسرع تحميل
 YDL_OPTIONS = {
@@ -36,6 +39,7 @@ YDL_OPTIONS = {
     "extract_flat": False,
     "geo_bypass": True,
     "extractor_args": {"youtube": {"skip": ["dash", "hls"]}},
+    "noprogress": True,
 }
 
 # إعدادات FFmpeg - بدون تأخير
