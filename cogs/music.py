@@ -25,16 +25,17 @@ elif os.path.exists("cookies.txt"):
 
 # إعدادات yt-dlp - بدون إعلانات وأسرع تحميل
 YDL_OPTIONS = {
-    "format": "worstaudio/worst/best",
+    "format": "bestaudio/bestvideo+bestaudio/best/worstaudio/worst",
     "noplaylist": False,
-    "quiet": True,
-    "no_warnings": True,
+    "quiet": False,
+    "no_warnings": False,
     "default_search": "ytsearch",
     "source_address": "0.0.0.0",
     "cookiefile": COOKIES_FILE,
     "postprocessors": [],
     "extract_flat": False,
     "geo_bypass": True,
+    "extractor_args": {"youtube": {"skip": ["dash", "hls"]}},
 }
 
 # إعدادات FFmpeg - بدون تأخير
@@ -65,18 +66,21 @@ class MusicCog(commands.Cog, name="Music"):
             opts = YDL_OPTIONS.copy()
             with yt_dlp.YoutubeDL(opts) as ydl:
                 try:
-                    # لو مش رابط، يدور على يوتيوب
                     if not query.startswith("http"):
                         info = ydl.extract_info(f"ytsearch5:{query}", download=False)
                         if info and "entries" in info:
-                            # جرب أول فيديو متاح
                             for entry in info["entries"]:
                                 if entry:
                                     try:
-                                        full = ydl.extract_info(entry["url"] if "url" in entry else f"https://www.youtube.com/watch?v={entry['id']}", download=False)
-                                        if full and full.get("url"):
-                                            return full
-                                    except Exception:
+                                        vid_url = entry.get("url") or f"https://www.youtube.com/watch?v={entry['id']}"
+                                        full = ydl.extract_info(vid_url, download=False)
+                                        if full:
+                                            formats = full.get("formats", [])
+                                            print(f"[Music] Available formats: {[f.get('format_id') for f in formats]}")
+                                            if full.get("url"):
+                                                return full
+                                    except Exception as e:
+                                        print(f"[Music] Entry error: {e}")
                                         continue
                     else:
                         info = ydl.extract_info(query, download=False)
