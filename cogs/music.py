@@ -10,8 +10,16 @@ _cookies_content = os.getenv("YOUTUBE_COOKIES", "")
 COOKIES_FILE = None
 if _cookies_content:
     COOKIES_FILE = "/tmp/cookies.txt"
-    with open(COOKIES_FILE, "w") as f:
-        f.write(_cookies_content)
+    import base64
+    try:
+        # جرب base64 أول
+        decoded = base64.b64decode(_cookies_content).decode("utf-8")
+        with open(COOKIES_FILE, "w") as f:
+            f.write(decoded)
+    except Exception:
+        # لو مش base64، اكتبه مباشرة
+        with open(COOKIES_FILE, "w") as f:
+            f.write(_cookies_content)
 elif os.path.exists("cookies.txt"):
     COOKIES_FILE = "cookies.txt"
 
