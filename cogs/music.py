@@ -5,6 +5,8 @@ import asyncio
 import os
 import base64
 import shutil
+import json
+import subprocess
 from collections import deque
 
 # ─── Cookies ───────────────────────────────────────────────────────────────
@@ -22,9 +24,7 @@ if _cookies_content:
 elif os.path.exists("cookies.txt"):
     COOKIES_FILE = "cookies.txt"
 
-import subprocess
-
-# ─── Install ffmpeg if not found ───────────────────────────────────────────
+# ─── FFmpeg ────────────────────────────────────────────────────────────────
 def ensure_ffmpeg():
     path = shutil.which("ffmpeg")
     if path:
@@ -40,19 +40,8 @@ def ensure_ffmpeg():
         print(f"[Music] apt install failed: {e}")
     return "ffmpeg"
 
-# ─── FFmpeg path ───────────────────────────────────────────────────────────
 FFMPEG_PATH = ensure_ffmpeg()
 print(f"[Music] FFmpeg path: {FFMPEG_PATH}")
-
-# ─── yt-dlp options ────────────────────────────────────────────────────────
-YDL_OPTIONS = {
-    "format": "bestaudio/best",
-    "quiet": True,
-    "no_warnings": True,
-    "default_search": "scsearch",  # SoundCloud بدل YouTube
-    "source_address": "0.0.0.0",
-    "extract_flat": False,
-}
 
 FFMPEG_OPTIONS = {
     "executable": FFMPEG_PATH,
@@ -60,7 +49,106 @@ FFMPEG_OPTIONS = {
     "options": "-vn -bufsize 512k",
 }
 
+YDL_OPTIONS = {
+    "format": "bestaudio/best",
+    "quiet": True,
+    "no_warnings": True,
+    "default_search": "scsearch",
+    "source_address": "0.0.0.0",
+    "extract_flat": False,
+}
 
+PLAYLISTS_FILE = "playlists.json"
+
+
+# ─── Playlist Storage ──────────────────────────────────────────────────────
+def load_playlists() -> dict:
+    if os.path.exists(PLAYLISTS_FILE):
+        with open(PLAYLISTS_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return {}
+
+def save_playlists(data: dict):
+    with open(PLAYLISTS_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+
+# ─── Player Buttons View ───────────────────────────────────────────────────
+class PlayerView(discord.ui.View):
+    def __init__(self, cog, ctx):
+        super().__init__(timeout=None)
+        self.cog = cog
+        self.ctx = ctx
+
+    @discord.ui.button(emoji="⏸", style=discord.ButtonStyle.secondary, custom_id="pause_resume")
+    async def pause_resume(self, interaction: discord.Interaction, button: discord.ui.Button):
+        vc = self.ctx.voice_client
+        if not vc:
+            return await interaction.response.send_message("❌ مفيش حاجة بتشتغل.", ephemeral=True)
+        if vc.is_playing():
+            vc.pause()
+            button.emoji = "▶️"
+            await interaction.response.edit_message(view=self)
+        elif vc.is_paused():
+            vc.resume()
+            button.emoji = "⏸"
+            await interaction.response.edit_message(view=self)
+        else:
+            await interaction.response.send_message("❌ مفيش حاجة بتشتغل.", ephemeral=True)
+
+    @discord.ui.button(emoji="⏭", style=discord.ButtonStyle.secondary, custom_id="skip")
+    async def skip(self, interaction: discord.Interaction, button: discord.ui.Button):
+        vc = self.ctx.voice_client
+        if not vc or not vc.is_playing():
+            return await interaction.response.send_message("❌ مفيش حاجة بتشتغل.", ephemeral=True)
+        vc.stop()
+        await interaction.response.send_message("⏭ تم السكيب!", ephemeral=True)
+
+    @discord.ui.button(emoji="⏹", style=discord.ButtonStyle.danger, custom_id="stop")
+    async def stop(self, interaction: discord.Interaction, button: discord.ui.Button):
+        vc = self.ctx.voice_client
+        if not vc:
+            return await interaction.response.send_message("❌ مفيش حاجة.", ephemeral=True)
+        guild_id = self.ctx.guild.id
+        self.cog.queues[guild_id] = deque()
+        self.cog.current.pop(guild_id, None)
+        self.cog.loop_mode[guild_id] = False
+        vc.stop()
+        await interaction.response.send_message("⏹ تم إيقاف الموسيقى.", ephemeral=True)
+
+    @discord.ui.button(emoji="🔂", style=discord.ButtonStyle.secondary, custom_id="loop")
+    async def loop(self, interaction: discord.Interaction, button: discord.ui.Button):
+        guild_id = self.ctx.guild.id
+        self.cog.loop_mode[guild_id] = not self.cog.loop_mode.get(guild_id, False)
+        is_loop = self.cog.loop_mode[guild_id]
+        button.style = discord.ButtonStyle.success if is_loop else discord.ButtonStyle.secondary
+        await interaction.response.edit_message(view=self)
+        await interaction.followup.send("🔂 تكرار شغال" if is_loop else "➡️ تكرار وقف", ephemeral=True)
+
+    @discord.ui.button(emoji="📋", style=discord.ButtonStyle.primary, custom_id="queue")
+    async def queue(self, interaction: discord.Interaction, button: discord.ui.Button):
+        guild_id = self.ctx.guild.id
+        queue = self.cog.get_queue(guild_id)
+        current = self.cog.current.get(guild_id)
+        if not current and not queue:
+            return await interaction.response.send_message("📭 الـ queue فاضي.", ephemeral=True)
+        embed = discord.Embed(title="🎶 قائمة الأغاني", color=discord.Color.purple())
+        if current:
+            embed.add_field(
+                name="▶️ بيشتغل دلوقتي",
+                value=f"**{current['title']}** `{self.cog.fmt(current['duration'])}`",
+                inline=False,
+            )
+        if queue:
+            lines = [f"`{i}.` {t['title']} `{self.cog.fmt(t['duration'])}`"
+                     for i, t in enumerate(list(queue)[:10], 1)]
+            if len(queue) > 10:
+                lines.append(f"... و **{len(queue)-10}** أغنية تانية")
+            embed.add_field(name="📋 القادم", value="\n".join(lines), inline=False)
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+
+# ─── Cog ───────────────────────────────────────────────────────────────────
 class MusicCog(commands.Cog, name="Music"):
     def __init__(self, bot):
         self.bot = bot
@@ -73,12 +161,18 @@ class MusicCog(commands.Cog, name="Music"):
             self.queues[guild_id] = deque()
         return self.queues[guild_id]
 
+    def fmt(self, s: int) -> str:
+        if not s:
+            return "Live 🔴"
+        m, s = divmod(int(s), 60)
+        h, m = divmod(m, 60)
+        return f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
+
     async def search_and_extract(self, query: str) -> dict | None:
         loop = asyncio.get_event_loop()
 
         def _extract():
             with yt_dlp.YoutubeDL(YDL_OPTIONS) as ydl:
-                # لو YouTube link، نجرب YouTube
                 if "youtube.com" in query or "youtu.be" in query:
                     opts = YDL_OPTIONS.copy()
                     opts["cookiefile"] = COOKIES_FILE
@@ -86,7 +180,6 @@ class MusicCog(commands.Cog, name="Music"):
                     with yt_dlp.YoutubeDL(opts) as ydl2:
                         info = ydl2.extract_info(query, download=False)
                 else:
-                    # SoundCloud search
                     if not query.startswith("http"):
                         info = ydl.extract_info(f"scsearch:{query}", download=False)
                         if info and "entries" in info and info["entries"]:
@@ -121,18 +214,23 @@ class MusicCog(commands.Cog, name="Music"):
 
         try:
             result = await loop.run_in_executor(None, _extract)
-            print(f"[Music] Extract result: title={result.get('title') if result else None}, url={'OK' if result and result.get('url') else 'NONE'}")
             return result
         except Exception as e:
             print(f"[Music] Error: {e}")
             return None
 
-    def fmt(self, s: int) -> str:
-        if not s:
-            return "Live 🔴"
-        m, s = divmod(int(s), 60)
-        h, m = divmod(m, 60)
-        return f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
+    def build_now_playing_embed(self, track: dict, queue_len: int, loop: bool) -> discord.Embed:
+        embed = discord.Embed(
+            description=f"### 🎵 [{track['title']}]({track['webpage_url']})",
+            color=0x2B2D31,
+        )
+        embed.add_field(name="👤 الفنان", value=track["uploader"] or "Unknown", inline=True)
+        embed.add_field(name="⏱ المدة", value=self.fmt(track["duration"]), inline=True)
+        embed.add_field(name="🔂 تكرار", value="شغال ✅" if loop else "وقف ❌", inline=True)
+        embed.set_footer(text=f"📋 {queue_len} أغنية في الـ queue")
+        if track.get("thumbnail"):
+            embed.set_thumbnail(url=track["thumbnail"])
+        return embed
 
     async def play_next(self, ctx: commands.Context):
         guild_id = ctx.guild.id
@@ -162,17 +260,9 @@ class MusicCog(commands.Cog, name="Music"):
             source = discord.PCMVolumeTransformer(source, volume=0.8)
             vc.play(source, after=after)
 
-            embed = discord.Embed(
-                title="🎵 بيشتغل دلوقتي",
-                description=f"**[{track['title']}]({track['webpage_url']})**",
-                color=discord.Color.green(),
-            )
-            embed.add_field(name="⏱ المدة", value=self.fmt(track["duration"]))
-            embed.add_field(name="👤 القناة", value=track["uploader"])
-            if track["thumbnail"]:
-                embed.set_thumbnail(url=track["thumbnail"])
-            embed.set_footer(text=f"Queue: {len(queue)} أغنية متبقية")
-            await ctx.send(embed=embed)
+            embed = self.build_now_playing_embed(track, len(queue), self.loop_mode.get(guild_id, False))
+            view = PlayerView(self, ctx)
+            await ctx.send(embed=embed, view=view)
         except Exception as e:
             print(f"[Music] Playback error: {e}")
             await ctx.send(f"❌ خطأ في التشغيل: `{e}`")
@@ -182,6 +272,7 @@ class MusicCog(commands.Cog, name="Music"):
 
     @commands.command(name="p", aliases=["play", "شغل"])
     async def play(self, ctx: commands.Context, *, query: str):
+        """يشغل أغنية | !p <اسم أو رابط>"""
         if not ctx.author.voice:
             return await ctx.send("❌ لازم تكون في فويس شانل الأول!")
 
@@ -198,7 +289,6 @@ class MusicCog(commands.Cog, name="Music"):
         await loading.delete()
 
         if not track or not track.get("url"):
-            print(f"[Music] No track found for: {query} | track={track}")
             return await ctx.send("❌ مش لاقي الأغنية دي، جرب اسم تاني.")
 
         queue = self.get_queue(ctx.guild.id)
@@ -215,25 +305,19 @@ class MusicCog(commands.Cog, name="Music"):
             source = discord.PCMVolumeTransformer(source, volume=0.8)
             vc.play(source, after=after)
 
-            embed = discord.Embed(
-                title="🎵 بيشتغل دلوقتي",
-                description=f"**[{track['title']}]({track['webpage_url']})**",
-                color=discord.Color.green(),
-            )
-            embed.add_field(name="⏱ المدة", value=self.fmt(track["duration"]))
-            embed.add_field(name="👤 القناة", value=track["uploader"])
-            if track["thumbnail"]:
-                embed.set_thumbnail(url=track["thumbnail"])
-            await ctx.send(embed=embed)
+            embed = self.build_now_playing_embed(track, len(queue), self.loop_mode.get(ctx.guild.id, False))
+            view = PlayerView(self, ctx)
+            await ctx.send(embed=embed, view=view)
         else:
             queue.append(track)
             embed = discord.Embed(
-                title="➕ اتضافت للـ Queue",
-                description=f"**[{track['title']}]({track['webpage_url']})**",
-                color=discord.Color.blue(),
+                description=f"### ➕ اتضافت للـ Queue\n**[{track['title']}]({track['webpage_url']})**",
+                color=0x5865F2,
             )
-            embed.add_field(name="⏱ المدة", value=self.fmt(track["duration"]))
-            embed.add_field(name="📋 موقعها", value=f"#{len(queue)}")
+            embed.add_field(name="⏱ المدة", value=self.fmt(track["duration"]), inline=True)
+            embed.add_field(name="📋 موقعها", value=f"#{len(queue)}", inline=True)
+            if track.get("thumbnail"):
+                embed.set_thumbnail(url=track["thumbnail"])
             await ctx.send(embed=embed)
 
     @commands.command(name="skip", aliases=["s", "سكيب"])
@@ -242,7 +326,6 @@ class MusicCog(commands.Cog, name="Music"):
         if not vc or not vc.is_playing():
             return await ctx.send("❌ مفيش حاجة بتشتغل.")
         vc.stop()
-        await ctx.send("⏭ تم السكيب!")
 
     @commands.command(name="stop", aliases=["وقف"])
     async def stop(self, ctx):
@@ -273,26 +356,8 @@ class MusicCog(commands.Cog, name="Music"):
         else:
             await ctx.send("❌ الأغنية مش متوقفة.")
 
-    @commands.command(name="queue", aliases=["q", "قائمة"])
-    async def show_queue(self, ctx):
-        queue = self.get_queue(ctx.guild.id)
-        current = self.current.get(ctx.guild.id)
-        if not current and not queue:
-            return await ctx.send("📭 الـ queue فاضي.")
-        embed = discord.Embed(title="🎶 قائمة الأغاني", color=discord.Color.purple())
-        if current:
-            embed.add_field(name="▶️ بيشتغل دلوقتي",
-                value=f"**{current['title']}** ({self.fmt(current['duration'])})", inline=False)
-        if queue:
-            lines = [f"`{i}.` {t['title']} ({self.fmt(t['duration'])})"
-                     for i, t in enumerate(list(queue)[:10], 1)]
-            if len(queue) > 10:
-                lines.append(f"... و {len(queue)-10} أغنية تانية")
-            embed.add_field(name="📋 القادم", value="\n".join(lines), inline=False)
-        await ctx.send(embed=embed)
-
     @commands.command(name="loop", aliases=["لوب"])
-    async def loop(self, ctx):
+    async def loop_cmd(self, ctx):
         self.loop_mode[ctx.guild.id] = not self.loop_mode.get(ctx.guild.id, False)
         await ctx.send("🔂 تكرار شغال" if self.loop_mode[ctx.guild.id] else "➡️ تكرار وقف")
 
@@ -311,14 +376,29 @@ class MusicCog(commands.Cog, name="Music"):
         current = self.current.get(ctx.guild.id)
         if not current:
             return await ctx.send("❌ مفيش حاجة بتشتغل.")
-        embed = discord.Embed(
-            title="🎵 بيشتغل دلوقتي",
-            description=f"**[{current['title']}]({current['webpage_url']})**",
-            color=discord.Color.green(),
-        )
-        embed.add_field(name="⏱ المدة", value=self.fmt(current["duration"]))
-        if current["thumbnail"]:
-            embed.set_thumbnail(url=current["thumbnail"])
+        embed = self.build_now_playing_embed(current, len(self.get_queue(ctx.guild.id)), self.loop_mode.get(ctx.guild.id, False))
+        view = PlayerView(self, ctx)
+        await ctx.send(embed=embed, view=view)
+
+    @commands.command(name="queue", aliases=["q", "قائمة"])
+    async def show_queue(self, ctx):
+        queue = self.get_queue(ctx.guild.id)
+        current = self.current.get(ctx.guild.id)
+        if not current and not queue:
+            return await ctx.send("📭 الـ queue فاضي.")
+        embed = discord.Embed(title="🎶 قائمة الأغاني", color=0x2B2D31)
+        if current:
+            embed.add_field(
+                name="▶️ بيشتغل دلوقتي",
+                value=f"**{current['title']}** `{self.fmt(current['duration'])}`",
+                inline=False,
+            )
+        if queue:
+            lines = [f"`{i}.` {t['title']} `{self.fmt(t['duration'])}`"
+                     for i, t in enumerate(list(queue)[:10], 1)]
+            if len(queue) > 10:
+                lines.append(f"... و **{len(queue)-10}** أغنية تانية")
+            embed.add_field(name="📋 القادم", value="\n".join(lines), inline=False)
         await ctx.send(embed=embed)
 
     @commands.command(name="join", aliases=["انضم"])
@@ -341,6 +421,161 @@ class MusicCog(commands.Cog, name="Music"):
         self.current.pop(ctx.guild.id, None)
         await vc.disconnect()
         await ctx.send("👋 خرجت من الفويس شانل.")
+
+    # ─── Playlist Commands ─────────────────────────────────────────────────
+
+    @commands.group(name="pl", aliases=["playlist"], invoke_without_command=True)
+    async def playlist(self, ctx):
+        """إدارة الـ playlists | !pl help"""
+        embed = discord.Embed(title="🎵 Playlist Commands", color=0x5865F2)
+        embed.add_field(name="!pl create <اسم>", value="إنشاء playlist جديدة", inline=False)
+        embed.add_field(name="!pl add <اسم> <أغنية>", value="إضافة أغنية للـ playlist", inline=False)
+        embed.add_field(name="!pl remove <اسم> <رقم>", value="حذف أغنية من الـ playlist", inline=False)
+        embed.add_field(name="!pl play <اسم>", value="تشغيل playlist كاملة", inline=False)
+        embed.add_field(name="!pl list", value="عرض كل الـ playlists", inline=False)
+        embed.add_field(name="!pl show <اسم>", value="عرض أغاني playlist معينة", inline=False)
+        embed.add_field(name="!pl delete <اسم>", value="حذف playlist كاملة", inline=False)
+        await ctx.send(embed=embed)
+
+    @playlist.command(name="create")
+    async def pl_create(self, ctx, *, name: str):
+        """إنشاء playlist جديدة"""
+        data = load_playlists()
+        key = f"{ctx.author.id}_{name}"
+        if key in data:
+            return await ctx.send(f"❌ عندك playlist بالاسم ده بالفعل.")
+        data[key] = {"name": name, "owner": ctx.author.id, "owner_name": str(ctx.author), "songs": []}
+        save_playlists(data)
+        await ctx.send(f"✅ اتعملت playlist **{name}** بنجاح!")
+
+    @playlist.command(name="add")
+    async def pl_add(self, ctx, name: str, *, query: str):
+        """إضافة أغنية لـ playlist"""
+        data = load_playlists()
+        key = f"{ctx.author.id}_{name}"
+        if key not in data:
+            return await ctx.send(f"❌ مش لاقي playlist بالاسم **{name}**.")
+        loading = await ctx.send("🔍 بدور على الأغنية...")
+        track = await self.search_and_extract(query)
+        await loading.delete()
+        if not track or not track.get("url"):
+            return await ctx.send("❌ مش لاقي الأغنية دي.")
+        data[key]["songs"].append({
+            "title": track["title"],
+            "webpage_url": track["webpage_url"],
+            "duration": track["duration"],
+            "uploader": track["uploader"],
+            "query": query,
+        })
+        save_playlists(data)
+        embed = discord.Embed(
+            description=f"✅ اتضافت **{track['title']}** لـ playlist **{name}**",
+            color=0x57F287,
+        )
+        embed.set_footer(text=f"إجمالي الأغاني: {len(data[key]['songs'])}")
+        await ctx.send(embed=embed)
+
+    @playlist.command(name="remove")
+    async def pl_remove(self, ctx, name: str, index: int):
+        """حذف أغنية من playlist"""
+        data = load_playlists()
+        key = f"{ctx.author.id}_{name}"
+        if key not in data:
+            return await ctx.send(f"❌ مش لاقي playlist **{name}**.")
+        songs = data[key]["songs"]
+        if index < 1 or index > len(songs):
+            return await ctx.send(f"❌ الرقم غلط، الـ playlist فيها {len(songs)} أغنية.")
+        removed = songs.pop(index - 1)
+        save_playlists(data)
+        await ctx.send(f"🗑️ اتحذفت **{removed['title']}** من **{name}**.")
+
+    @playlist.command(name="play")
+    async def pl_play(self, ctx, *, name: str):
+        """تشغيل playlist كاملة"""
+        if not ctx.author.voice:
+            return await ctx.send("❌ لازم تكون في فويس شانل الأول!")
+        data = load_playlists()
+        key = f"{ctx.author.id}_{name}"
+        if key not in data:
+            return await ctx.send(f"❌ مش لاقي playlist **{name}**.")
+        songs = data[key]["songs"]
+        if not songs:
+            return await ctx.send(f"❌ الـ playlist **{name}** فاضية.")
+
+        channel = ctx.author.voice.channel
+        vc = ctx.voice_client
+        if not vc:
+            vc = await channel.connect()
+        elif vc.channel != channel:
+            await vc.move_to(channel)
+
+        queue = self.get_queue(ctx.guild.id)
+        loading = await ctx.send(f"⏳ بيحمل **{name}** ({len(songs)} أغنية)...")
+
+        added = 0
+        for song in songs:
+            track = await self.search_and_extract(song.get("query") or song["title"])
+            if track and track.get("url"):
+                queue.append(track)
+                added += 1
+
+        await loading.delete()
+
+        embed = discord.Embed(
+            description=f"### 🎵 Playlist: **{name}**\nاتضافت **{added}** أغنية للـ queue",
+            color=0x5865F2,
+        )
+        embed.set_footer(text=f"بتاع {data[key]['owner_name']}")
+        await ctx.send(embed=embed)
+
+        if not vc.is_playing() and not vc.is_paused():
+            await self.play_next(ctx)
+
+    @playlist.command(name="list")
+    async def pl_list(self, ctx):
+        """عرض كل الـ playlists"""
+        data = load_playlists()
+        user_pls = {k: v for k, v in data.items() if v["owner"] == ctx.author.id}
+        if not user_pls:
+            return await ctx.send("📭 مش عندك أي playlist.")
+        embed = discord.Embed(title=f"🎵 Playlists بتاعت {ctx.author.display_name}", color=0x5865F2)
+        for k, v in user_pls.items():
+            embed.add_field(
+                name=f"📋 {v['name']}",
+                value=f"{len(v['songs'])} أغنية",
+                inline=True,
+            )
+        await ctx.send(embed=embed)
+
+    @playlist.command(name="show")
+    async def pl_show(self, ctx, *, name: str):
+        """عرض أغاني playlist"""
+        data = load_playlists()
+        key = f"{ctx.author.id}_{name}"
+        if key not in data:
+            return await ctx.send(f"❌ مش لاقي playlist **{name}**.")
+        songs = data[key]["songs"]
+        if not songs:
+            return await ctx.send(f"📭 الـ playlist **{name}** فاضية.")
+        embed = discord.Embed(title=f"🎵 {name}", color=0x5865F2)
+        lines = [f"`{i}.` [{s['title']}]({s['webpage_url']}) `{self.fmt(s['duration'])}`"
+                 for i, s in enumerate(songs[:20], 1)]
+        if len(songs) > 20:
+            lines.append(f"... و **{len(songs)-20}** أغنية تانية")
+        embed.description = "\n".join(lines)
+        embed.set_footer(text=f"إجمالي: {len(songs)} أغنية")
+        await ctx.send(embed=embed)
+
+    @playlist.command(name="delete")
+    async def pl_delete(self, ctx, *, name: str):
+        """حذف playlist كاملة"""
+        data = load_playlists()
+        key = f"{ctx.author.id}_{name}"
+        if key not in data:
+            return await ctx.send(f"❌ مش لاقي playlist **{name}**.")
+        del data[key]
+        save_playlists(data)
+        await ctx.send(f"🗑️ اتحذفت playlist **{name}** بنجاح.")
 
 
 async def setup(bot):
