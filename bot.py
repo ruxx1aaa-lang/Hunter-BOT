@@ -9,7 +9,12 @@ intents.members = True
 intents.message_content = True
 intents.presences = True
 
-bot = commands.Bot(command_prefix=config.PREFIX, intents=intents, help_command=None)
+def get_prefix(bot, message):
+    # يقبل الـ prefix الأصلي (مثلاً "!hunt ") و "!" كمان
+    prefixes = [config.PREFIX, "!"]
+    return commands.when_mentioned_or(*prefixes)(bot, message)
+
+bot = commands.Bot(command_prefix=get_prefix, intents=intents, help_command=None)
 
 async def init_db():
     async with aiosqlite.connect("hunter.db") as db:
@@ -51,7 +56,7 @@ async def on_message(message):
     await bot.process_commands(message)
 
 async def load_cogs():
-    cogs = ["cogs.logging", "cogs.antispam", "cogs.antiraid", "cogs.moderation", "cogs.stats"]
+    cogs = ["cogs.logging", "cogs.antispam", "cogs.antiraid", "cogs.moderation", "cogs.stats", "cogs.music"]
     for cog in cogs:
         await bot.load_extension(cog)
         print(f"  ✔ Loaded {cog}")
