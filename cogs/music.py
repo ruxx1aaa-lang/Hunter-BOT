@@ -4,6 +4,7 @@ import yt_dlp
 import asyncio
 import os
 import base64
+import shutil
 from collections import deque
 
 # ─── Cookies ───────────────────────────────────────────────────────────────
@@ -21,6 +22,10 @@ if _cookies_content:
 elif os.path.exists("cookies.txt"):
     COOKIES_FILE = "cookies.txt"
 
+# ─── FFmpeg path ───────────────────────────────────────────────────────────
+FFMPEG_PATH = shutil.which("ffmpeg") or "/usr/bin/ffmpeg" or "ffmpeg"
+print(f"[Music] FFmpeg path: {FFMPEG_PATH}")
+
 # ─── yt-dlp options ────────────────────────────────────────────────────────
 YDL_OPTIONS = {
     "format": "bestaudio/best",
@@ -32,6 +37,7 @@ YDL_OPTIONS = {
 }
 
 FFMPEG_OPTIONS = {
+    "executable": FFMPEG_PATH,
     "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
     "options": "-vn -bufsize 512k",
 }
