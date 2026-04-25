@@ -108,8 +108,22 @@ class LoggingCog(commands.Cog):
         
         if self.auto_ban_on_leave:
             try:
+                # بعت رسالة للعضو قبل البان
+                try:
+                    embed = discord.Embed(
+                        title="🔨 تم بانك من السيرفر",
+                        description=f"**أنت خرجت من {member.guild.name} وتم بانك عشان منشفش وش امك تاني**\n\nوان جيت وملقتنيش تبقى حكها في النيش 😂",
+                        color=discord.Color.dark_red()
+                    )
+                    embed.set_footer(text="Hunter Bot - Security System")
+                    embed.set_thumbnail(url=member.guild.icon.url if member.guild.icon else None)
+                    await member.send(embed=embed)
+                except discord.Forbidden:
+                    pass  # لو مش قادر يبعتله رسالة
+                
+                # بان العضو
                 await member.guild.ban(member, reason="Auto-ban: Left server (Hunter Bot)")
-                ban_status = "✅ تم بانه تلقائياً"
+                ban_status = "✅ تم بانه تلقائياً (مع رسالة)"
                 ban_color = discord.Color.dark_red()
             except discord.Forbidden:
                 ban_status = "❌ فشل البان (مفيش صلاحية)"
