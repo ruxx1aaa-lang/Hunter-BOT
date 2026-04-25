@@ -22,18 +22,30 @@ class LoggingCog(commands.Cog):
     @commands.has_permissions(administrator=True)
     async def toggle_autoban(self, ctx, status: str = None):
         """تشغيل/إيقاف البان التلقائي عند المغادرة | !autoban on/off"""
-        if status is None:
-            current = "شغال ✅" if self.auto_ban_on_leave else "وقف ❌"
-            return await ctx.send(f"🔨 البان التلقائي حالياً: **{current}**\nاستخدم `!autoban on` أو `!autoban off`")
-        
-        if status.lower() in ["on", "enable", "شغل", "تشغيل"]:
-            self.auto_ban_on_leave = True
-            await ctx.send("✅ تم تشغيل البان التلقائي عند المغادرة.")
-        elif status.lower() in ["off", "disable", "وقف", "إيقاف"]:
-            self.auto_ban_on_leave = False
-            await ctx.send("❌ تم إيقاف البان التلقائي عند المغادرة.")
+        try:
+            if status is None:
+                current = "شغال ✅" if self.auto_ban_on_leave else "وقف ❌"
+                return await ctx.send(f"🔨 البان التلقائي حالياً: **{current}**\nاستخدم `!hunt autoban on` أو `!hunt autoban off`")
+            
+            if status.lower() in ["on", "enable", "شغل", "تشغيل"]:
+                self.auto_ban_on_leave = True
+                await ctx.send("✅ تم تشغيل البان التلقائي عند المغادرة.")
+            elif status.lower() in ["off", "disable", "وقف", "إيقاف"]:
+                self.auto_ban_on_leave = False
+                await ctx.send("❌ تم إيقاف البان التلقائي عند المغادرة.")
+            else:
+                await ctx.send("❌ استخدم `on` أو `off` فقط.")
+        except Exception as e:
+            print(f"[AutoBan] Error: {e}")
+            await ctx.send(f"❌ حصل خطأ: {e}")
+
+    @toggle_autoban.error
+    async def autoban_error(self, ctx, error):
+        if isinstance(error, commands.MissingPermissions):
+            await ctx.send("❌ محتاج صلاحية Administrator عشان تستخدم الكوماند ده.")
         else:
-            await ctx.send("❌ استخدم `on` أو `off` فقط.")
+            print(f"[AutoBan] Command error: {error}")
+            await ctx.send("❌ حصل خطأ في الكوماند.")
 
     # --- Member Events ---
     @commands.Cog.listener()
