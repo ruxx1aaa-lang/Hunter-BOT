@@ -16,6 +16,24 @@ def base_embed(title, color, user=None):
 class LoggingCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+        self.auto_ban_on_leave = True  # الخاصية شغالة بشكل افتراضي
+
+    @commands.command(name="autoban")
+    @commands.has_permissions(administrator=True)
+    async def toggle_autoban(self, ctx, status: str = None):
+        """تشغيل/إيقاف البان التلقائي عند المغادرة | !autoban on/off"""
+        if status is None:
+            current = "شغال ✅" if self.auto_ban_on_leave else "وقف ❌"
+            return await ctx.send(f"🔨 البان التلقائي حالياً: **{current}**\nاستخدم `!autoban on` أو `!autoban off`")
+        
+        if status.lower() in ["on", "enable", "شغل", "تشغيل"]:
+            self.auto_ban_on_leave = True
+            await ctx.send("✅ تم تشغيل البان التلقائي عند المغادرة.")
+        elif status.lower() in ["off", "disable", "وقف", "إيقاف"]:
+            self.auto_ban_on_leave = False
+            await ctx.send("❌ تم إيقاف البان التلقائي عند المغادرة.")
+        else:
+            await ctx.send("❌ استخدم `on` أو `off` فقط.")
 
     # --- Member Events ---
     @commands.Cog.listener()
@@ -71,12 +89,29 @@ class LoggingCog(commands.Cog):
     @commands.Cog.listener()
     async def on_member_remove(self, member):
         ch = get_log_channel(member.guild)
-        if not ch:
-            return
-        embed = base_embed("� عضو غادر السيرفر", discord.Color.red(), member)
-        embed.add_field(name="الاسم", value=str(member), inline=True)
-        embed.add_field(name="ID", value=member.id, inline=True)
-        await ch.send(embed=embed)
+        
+        # Auto-ban on leave (إذا كانت الخاصية شغالة)
+        ban_status = "❌ الخاصية وقف"
+        ban_color = discord.Color.red()
+        
+        if self.auto_ban_on_leave:
+            try:
+                await member.guild.ban(member, reason="Auto-ban: Left server (Hunter Bot)")
+                ban_status = "✅ تم بانه تلقائياً"
+                ban_color = discord.Color.dark_red()
+            except discord.Forbidden:
+                ban_status = "❌ فشل البان (مفيش صلاحية)"
+            except discord.HTTPException:
+                ban_status = "❌ فشل البان (خطأ تقني)"
+            except Exception as e:
+                ban_status = f"❌ فشل البان: {str(e)[:50]}"
+        
+        if ch:
+            embed = base_embed("📤 عضو غادر السيرفر", ban_color, member)
+            embed.add_field(name="الاسم", value=str(member), inline=True)
+            embed.add_field(name="ID", value=member.id, inline=True)
+            embed.add_field(name="🔨 Auto-Ban", value=ban_status, inline=False)
+            await ch.send(embed=embed)
 
     @commands.Cog.listener()
     async def on_member_update(self, before, after):
