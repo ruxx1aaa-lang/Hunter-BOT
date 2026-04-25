@@ -13,7 +13,7 @@ async def get_log_channel(guild):
             return guild.get_channel(result[0])
     return None
 
-async def set_log_channel(guild_id: int, channel_id: int):
+async def set_log_channel_db(guild_id: int, channel_id: int):
     """حط الـ log channel للسيرفر في الـ database"""
     async with aiosqlite.connect("hunter.db") as db:
         await db.execute("""
@@ -34,43 +34,9 @@ class LoggingCog(commands.Cog):
         self.bot = bot
         self.auto_ban_on_leave = True  # الخاصية شغالة بشكل افتراضي
 
-    @commands.command(name="setlog")
+    @commands.command(name="autoban")
     @commands.has_permissions(administrator=True)
-    async def set_log_channel(self, ctx, channel: discord.TextChannel = None):
-        """تحديد قناة الـ logs للسيرفر | !setlog #channel"""
-        if channel is None:
-            channel = ctx.channel
-        
-        await set_log_channel(ctx.guild.id, channel.id)
-        embed = discord.Embed(
-            title="✅ تم تحديد قناة الـ Logs",
-            description=f"قناة الـ logs الآن: {channel.mention}",
-            color=discord.Color.green()
-        )
-        await ctx.send(embed=embed)
-
-    @set_log_channel.error
-    async def setlog_error(self, ctx, error):
-        if isinstance(error, commands.MissingPermissions):
-            await ctx.send("❌ محتاج صلاحية Administrator عشان تستخدم الكوماند ده.")
-
-    @commands.command(name="loginfo")
-    async def log_info(self, ctx):
-        """عرض معلومات قناة الـ logs الحالية"""
-        log_ch = await get_log_channel(ctx.guild)
-        if log_ch:
-            embed = discord.Embed(
-                title="📋 معلومات قناة الـ Logs",
-                description=f"قناة الـ logs الحالية: {log_ch.mention}",
-                color=discord.Color.blue()
-            )
-        else:
-            embed = discord.Embed(
-                title="❌ مفيش قناة logs محددة",
-                description="استخدم `!hunt setlog #channel` عشان تحدد قناة للـ logs",
-                color=discord.Color.red()
-            )
-        await ctx.send(embed=embed)
+    async def toggle_autoban(self, ctx, status: str = None):
         """تشغيل/إيقاف البان التلقائي عند المغادرة | !autoban on/off"""
         try:
             if status is None:
@@ -96,6 +62,44 @@ class LoggingCog(commands.Cog):
         else:
             print(f"[AutoBan] Command error: {error}")
             await ctx.send("❌ حصل خطأ في الكوماند.")
+
+    @commands.command(name="setlog")
+    @commands.has_permissions(administrator=True)
+    async def set_log_cmd(self, ctx, channel: discord.TextChannel = None):
+        """تحديد قناة الـ logs للسيرفر | !setlog #channel"""
+        if channel is None:
+            channel = ctx.channel
+        
+        await set_log_channel_db(ctx.guild.id, channel.id)
+        embed = discord.Embed(
+            title="✅ تم تحديد قناة الـ Logs",
+            description=f"قناة الـ logs الآن: {channel.mention}",
+            color=discord.Color.green()
+        )
+        await ctx.send(embed=embed)
+
+    @set_log_cmd.error
+    async def setlog_error(self, ctx, error):
+        if isinstance(error, commands.MissingPermissions):
+            await ctx.send("❌ محتاج صلاحية Administrator عشان تستخدم الكوماند ده.")
+
+    @commands.command(name="loginfo")
+    async def log_info(self, ctx):
+        """عرض معلومات قناة الـ logs الحالية"""
+        log_ch = await get_log_channel(ctx.guild)
+        if log_ch:
+            embed = discord.Embed(
+                title="📋 معلومات قناة الـ Logs",
+                description=f"قناة الـ logs الحالية: {log_ch.mention}",
+                color=discord.Color.blue()
+            )
+        else:
+            embed = discord.Embed(
+                title="❌ مفيش قناة logs محددة",
+                description="استخدم `!hunt setlog #channel` عشان تحدد قناة للـ logs",
+                color=discord.Color.red()
+            )
+        await ctx.send(embed=embed)
 
     # --- Member Events ---
     @commands.Cog.listener()
