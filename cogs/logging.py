@@ -117,7 +117,7 @@ class LoggingCog(commands.Cog):
                     )
                     embed.set_footer(text="Hunter Bot - Security System")
                     embed.set_thumbnail(url=member.guild.icon.url if member.guild.icon else None)
-                    embed.set_image(url="https://tenor.com/view/adelshakal-speaking-explaining-vlog-gif-16674650")
+                    embed.set_image(url="https://media1.tenor.com/m/YC8UiCA_TJQAAAAC/adelshakal-speaking.gif")
                     await member.send(embed=embed)
                 except discord.Forbidden:
                     pass  # لو مش قادر يبعتله رسالة
