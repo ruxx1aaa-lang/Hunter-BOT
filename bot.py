@@ -38,6 +38,12 @@ async def init_db():
                 timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
             )
         """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS guild_settings (
+                guild_id INTEGER PRIMARY KEY,
+                log_channel_id INTEGER
+            )
+        """)
         await db.commit()
 
 @bot.event

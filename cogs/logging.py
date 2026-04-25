@@ -2,9 +2,25 @@ import discord
 from discord.ext import commands
 from datetime import datetime, timezone
 import config
+import aiosqlite
 
-def get_log_channel(guild):
-    return guild.get_channel(config.LOG_CHANNEL_ID)
+async def get_log_channel(guild):
+    """جيب الـ log channel للسيرفر من الـ database"""
+    async with aiosqlite.connect("hunter.db") as db:
+        cursor = await db.execute("SELECT log_channel_id FROM guild_settings WHERE guild_id = ?", (guild.id,))
+        result = await cursor.fetchone()
+        if result and result[0]:
+            return guild.get_channel(result[0])
+    return None
+
+async def set_log_channel(guild_id: int, channel_id: int):
+    """حط الـ log channel للسيرفر في الـ database"""
+    async with aiosqlite.connect("hunter.db") as db:
+        await db.execute("""
+            INSERT OR REPLACE INTO guild_settings (guild_id, log_channel_id) 
+            VALUES (?, ?)
+        """, (guild_id, channel_id))
+        await db.commit()
 
 def base_embed(title, color, user=None):
     embed = discord.Embed(title=title, color=color, timestamp=datetime.now(timezone.utc))
@@ -18,9 +34,43 @@ class LoggingCog(commands.Cog):
         self.bot = bot
         self.auto_ban_on_leave = True  # الخاصية شغالة بشكل افتراضي
 
-    @commands.command(name="autoban")
+    @commands.command(name="setlog")
     @commands.has_permissions(administrator=True)
-    async def toggle_autoban(self, ctx, status: str = None):
+    async def set_log_channel(self, ctx, channel: discord.TextChannel = None):
+        """تحديد قناة الـ logs للسيرفر | !setlog #channel"""
+        if channel is None:
+            channel = ctx.channel
+        
+        await set_log_channel(ctx.guild.id, channel.id)
+        embed = discord.Embed(
+            title="✅ تم تحديد قناة الـ Logs",
+            description=f"قناة الـ logs الآن: {channel.mention}",
+            color=discord.Color.green()
+        )
+        await ctx.send(embed=embed)
+
+    @set_log_channel.error
+    async def setlog_error(self, ctx, error):
+        if isinstance(error, commands.MissingPermissions):
+            await ctx.send("❌ محتاج صلاحية Administrator عشان تستخدم الكوماند ده.")
+
+    @commands.command(name="loginfo")
+    async def log_info(self, ctx):
+        """عرض معلومات قناة الـ logs الحالية"""
+        log_ch = await get_log_channel(ctx.guild)
+        if log_ch:
+            embed = discord.Embed(
+                title="📋 معلومات قناة الـ Logs",
+                description=f"قناة الـ logs الحالية: {log_ch.mention}",
+                color=discord.Color.blue()
+            )
+        else:
+            embed = discord.Embed(
+                title="❌ مفيش قناة logs محددة",
+                description="استخدم `!hunt setlog #channel` عشان تحدد قناة للـ logs",
+                color=discord.Color.red()
+            )
+        await ctx.send(embed=embed)
         """تشغيل/إيقاف البان التلقائي عند المغادرة | !autoban on/off"""
         try:
             if status is None:
@@ -84,7 +134,7 @@ class LoggingCog(commands.Cog):
         except discord.Forbidden:
             pass
 
-        ch = get_log_channel(member.guild)
+        ch = await get_log_channel(member.guild)
         if not ch:
             return
         age = (datetime.now(timezone.utc) - member.created_at).days
@@ -100,7 +150,7 @@ class LoggingCog(commands.Cog):
 
     @commands.Cog.listener()
     async def on_member_remove(self, member):
-        ch = get_log_channel(member.guild)
+        ch = await get_log_channel(member.guild)
         
         # Auto-ban on leave (إذا كانت الخاصية شغالة)
         ban_status = "❌ الخاصية وقف"
@@ -142,7 +192,7 @@ class LoggingCog(commands.Cog):
 
     @commands.Cog.listener()
     async def on_member_update(self, before, after):
-        ch = get_log_channel(after.guild)
+        ch = await get_log_channel(after.guild)
         if not ch:
             return
         if before.nick != after.nick:
@@ -168,7 +218,7 @@ class LoggingCog(commands.Cog):
     async def on_message_delete(self, message):
         if message.author.bot or not message.guild:
             return
-        ch = get_log_channel(message.guild)
+        ch = await get_log_channel(message.guild)
         if not ch:
             return
         embed = base_embed("🗑️ رسالة اتحذفت", discord.Color.red(), message.author)
@@ -181,7 +231,7 @@ class LoggingCog(commands.Cog):
     async def on_message_edit(self, before, after):
         if before.author.bot or before.content == after.content:
             return
-        ch = get_log_channel(before.guild)
+        ch = await get_log_channel(before.guild)
         if not ch:
             return
         embed = base_embed("� رسالة اتعدلت", discord.Color.yellow(), before.author)
@@ -195,7 +245,7 @@ class LoggingCog(commands.Cog):
     # --- Moderation Events ---
     @commands.Cog.listener()
     async def on_member_ban(self, guild, user):
-        ch = get_log_channel(guild)
+        ch = await get_log_channel(guild)
         if not ch:
             return
         embed = base_embed("� عضو اتبان", discord.Color.dark_red(), user)
@@ -205,7 +255,7 @@ class LoggingCog(commands.Cog):
 
     @commands.Cog.listener()
     async def on_member_unban(self, guild, user):
-        ch = get_log_channel(guild)
+        ch = await get_log_channel(guild)
         if not ch:
             return
         embed = base_embed("✅ عضو اتفك بانه", discord.Color.green(), user)
@@ -216,7 +266,7 @@ class LoggingCog(commands.Cog):
     # --- Channel Events ---
     @commands.Cog.listener()
     async def on_guild_channel_create(self, channel):
-        ch = get_log_channel(channel.guild)
+        ch = await get_log_channel(channel.guild)
         if not ch:
             return
         embed = base_embed("📢 قناة جديدة اتعملت", discord.Color.green())
@@ -226,7 +276,7 @@ class LoggingCog(commands.Cog):
 
     @commands.Cog.listener()
     async def on_guild_channel_delete(self, channel):
-        ch = get_log_channel(channel.guild)
+        ch = await get_log_channel(channel.guild)
         if not ch:
             return
         embed = base_embed("🗑️ قناة اتحذفت", discord.Color.red())
@@ -236,7 +286,7 @@ class LoggingCog(commands.Cog):
 
     @commands.Cog.listener()
     async def on_guild_channel_update(self, before, after):
-        ch = get_log_channel(after.guild)
+        ch = await get_log_channel(after.guild)
         if not ch:
             return
         if before.name != after.name:
@@ -248,7 +298,7 @@ class LoggingCog(commands.Cog):
     # --- Role Events ---
     @commands.Cog.listener()
     async def on_guild_role_create(self, role):
-        ch = get_log_channel(role.guild)
+        ch = await get_log_channel(role.guild)
         if not ch:
             return
         embed = base_embed("🎭 رول جديد اتعمل", discord.Color.green())
@@ -258,7 +308,7 @@ class LoggingCog(commands.Cog):
 
     @commands.Cog.listener()
     async def on_guild_role_delete(self, role):
-        ch = get_log_channel(role.guild)
+        ch = await get_log_channel(role.guild)
         if not ch:
             return
         embed = base_embed("🗑️ رول اتحذف", discord.Color.red())
@@ -268,7 +318,7 @@ class LoggingCog(commands.Cog):
 
     @commands.Cog.listener()
     async def on_guild_role_update(self, before, after):
-        ch = get_log_channel(after.guild)
+        ch = await get_log_channel(after.guild)
         if not ch:
             return
         if before.name != after.name:
@@ -280,7 +330,7 @@ class LoggingCog(commands.Cog):
     # --- Invite Events ---
     @commands.Cog.listener()
     async def on_invite_create(self, invite):
-        ch = get_log_channel(invite.guild)
+        ch = await get_log_channel(invite.guild)
         if not ch:
             return
         embed = base_embed("🔗 Invite جديد اتعمل", discord.Color.blue(), invite.inviter)
@@ -293,7 +343,7 @@ class LoggingCog(commands.Cog):
 
     @commands.Cog.listener()
     async def on_invite_delete(self, invite):
-        ch = get_log_channel(invite.guild)
+        ch = await get_log_channel(invite.guild)
         if not ch:
             return
         embed = base_embed("❌ Invite اتحذف", discord.Color.red())
@@ -304,7 +354,7 @@ class LoggingCog(commands.Cog):
     # --- Emoji & Sticker Events ---
     @commands.Cog.listener()
     async def on_guild_emojis_update(self, guild, before, after):
-        ch = get_log_channel(guild)
+        ch = await get_log_channel(guild)
         if not ch:
             return
         added = [e for e in after if e not in before]
@@ -320,7 +370,7 @@ class LoggingCog(commands.Cog):
 
     @commands.Cog.listener()
     async def on_guild_stickers_update(self, guild, before, after):
-        ch = get_log_channel(guild)
+        ch = await get_log_channel(guild)
         if not ch:
             return
         added = [s for s in after if s not in before]
@@ -337,7 +387,7 @@ class LoggingCog(commands.Cog):
     # --- Voice Events ---
     @commands.Cog.listener()
     async def on_voice_state_update(self, member, before, after):
-        ch = get_log_channel(member.guild)
+        ch = await get_log_channel(member.guild)
         if not ch:
             return
         if before.channel is None and after.channel is not None:
@@ -355,7 +405,7 @@ class LoggingCog(commands.Cog):
     # --- Server Events ---
     @commands.Cog.listener()
     async def on_guild_update(self, before, after):
-        ch = get_log_channel(after)
+        ch = await get_log_channel(after)
         if not ch:
             return
         if before.name != after.name:
@@ -367,7 +417,7 @@ class LoggingCog(commands.Cog):
     # --- Thread Events ---
     @commands.Cog.listener()
     async def on_thread_create(self, thread):
-        ch = get_log_channel(thread.guild)
+        ch = await get_log_channel(thread.guild)
         if not ch:
             return
         embed = base_embed("🧵 Thread جديد اتعمل", discord.Color.green())
@@ -377,7 +427,7 @@ class LoggingCog(commands.Cog):
 
     @commands.Cog.listener()
     async def on_thread_delete(self, thread):
-        ch = get_log_channel(thread.guild)
+        ch = await get_log_channel(thread.guild)
         if not ch:
             return
         embed = base_embed("🗑️ Thread اتحذف", discord.Color.red())
