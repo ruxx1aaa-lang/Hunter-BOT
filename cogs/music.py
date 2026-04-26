@@ -280,9 +280,9 @@ class MusicCog(commands.Cog, name="Music"):
         vc = ctx.voice_client
 
         if not vc:
-            vc = await channel.connect()
+            vc = await channel.connect(self_deaf=True)
         elif vc.channel != channel:
-            await vc.move_to(channel)
+            await vc.move_to(channel); await vc.guild.change_voice_state(channel=channel, self_deaf=True)
 
         loading = await ctx.send("🔍 بدور على الأغنية...")
         track = await self.search_and_extract(query)
@@ -409,7 +409,7 @@ class MusicCog(commands.Cog, name="Music"):
         if ctx.voice_client:
             await ctx.voice_client.move_to(channel)
         else:
-            await channel.connect()
+            await channel.connect(self_deaf=True)
         await ctx.send(f"✅ اتضمت لـ **{channel.name}**")
 
     @commands.command(name="leave", aliases=["dc", "امشي"])
@@ -505,9 +505,9 @@ class MusicCog(commands.Cog, name="Music"):
         channel = ctx.author.voice.channel
         vc = ctx.voice_client
         if not vc:
-            vc = await channel.connect()
+            vc = await channel.connect(self_deaf=True)
         elif vc.channel != channel:
-            await vc.move_to(channel)
+            await vc.move_to(channel); await vc.guild.change_voice_state(channel=channel, self_deaf=True)
 
         queue = self.get_queue(ctx.guild.id)
         loading = await ctx.send(f"⏳ بيحمل **{name}** ({len(songs)} أغنية)...")
