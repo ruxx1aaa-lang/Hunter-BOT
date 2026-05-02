@@ -235,9 +235,25 @@ class HelpView(discord.ui.View):
         embed = self.get_main_embed()
         await interaction.response.edit_message(embed=embed, view=self)
 
-    @discord.ui.button(label="🔗 دعوة البوت", style=discord.ButtonStyle.link, url="https://discord.com/api/oauth2/authorize?client_id=YOUR_BOT_ID&permissions=8&scope=bot", row=1)
+    @discord.ui.button(label="🔗 دعوة البوت", style=discord.ButtonStyle.secondary, row=1)
     async def invite_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        pass
+        embed = discord.Embed(
+            title="🔗 دعوة Hunter Bot",
+            description="**اضيف البوت لسيرفرك دلوقتي!**",
+            color=0x5865F2
+        )
+        embed.add_field(
+            name="📋 رابط الدعوة",
+            value="[اضغط هنا لدعوة البوت](https://discord.com/api/oauth2/authorize?client_id=YOUR_BOT_ID&permissions=8&scope=bot)",
+            inline=False
+        )
+        embed.add_field(
+            name="✅ الصلاحيات المطلوبة",
+            value="• إدارة السيرفر\n• إدارة الأعضاء\n• إدارة الرسائل\n• الاتصال بـ Voice Channels",
+            inline=False
+        )
+        embed.set_footer(text="شكراً لاختيارك Hunter Bot!")
+        await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @discord.ui.button(label="❌ إغلاق", style=discord.ButtonStyle.danger, row=1)
     async def close_button(self, interaction: discord.Interaction, button: discord.ui.Button):
