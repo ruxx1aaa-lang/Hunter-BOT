@@ -391,6 +391,10 @@ class LoggingCog(commands.Cog):
     # --- Voice Events ---
     @commands.Cog.listener()
     async def on_voice_state_update(self, member, before, after):
+        # تجاهل البوتات عشان منعملش spam في الـ logs
+        if member.bot:
+            return
+            
         ch = await get_log_channel(member.guild)
         if not ch:
             return
@@ -400,7 +404,7 @@ class LoggingCog(commands.Cog):
             embed.add_field(name="القناة", value=after.channel.name, inline=True)
             await ch.send(embed=embed)
         elif before.channel is not None and after.channel is not None and before.channel != after.channel:
-            embed = base_embed("� غير Voice Channel", discord.Color.blue(), member)
+            embed = base_embed("🔄 غير Voice Channel", discord.Color.blue(), member)
             embed.add_field(name="العضو", value=str(member), inline=True)
             embed.add_field(name="من", value=before.channel.name, inline=True)
             embed.add_field(name="إلى", value=after.channel.name, inline=True)
