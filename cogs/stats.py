@@ -91,11 +91,11 @@ class StatsCog(commands.Cog):
         embed.set_footer(text="Hunter Security Bot")
         await ctx.send(embed=embed)
 
-    @commands.command(name="help")
-    async def help_command(self, ctx):
-        """قائمة الأوامر"""
+    @commands.command(name="oldhelp")
+    async def old_help_command(self, ctx):
+        """قائمة الأوامر القديمة"""
         embed = discord.Embed(
-            title="🔍 Hunter Bot - قائمة الأوامر",
+            title="🔍 Hunter Bot - قائمة الأوامر القديمة",
             color=discord.Color.blue(),
             timestamp=discord.utils.utcnow()
         )
@@ -103,6 +103,7 @@ class StatsCog(commands.Cog):
         embed.add_field(name="⚠️ التحذيرات", value="`!warn @عضو [سبب]`\n`!warnings @عضو`\n`!clearwarns @عضو`", inline=False)
         embed.add_field(name="🔨 الإدارة", value="`!mute @عضو [دقايق] [سبب]`\n`!unmute @عضو`\n`!kick @عضو [سبب]`\n`!ban @عضو [سبب]`\n`!unban [ID]`\n`!purge [عدد]`", inline=False)
         embed.add_field(name="📊 الإحصائيات", value="`!serverstats`\n`!topusers`\n`!userinfo [@عضو]`", inline=False)
+        embed.add_field(name="💡 ملاحظة", value="استخدم `!help` للواجهة الجديدة التفاعلية!", inline=False)
         embed.set_footer(text="Hunter Security Bot")
         await ctx.send(embed=embed)
 
