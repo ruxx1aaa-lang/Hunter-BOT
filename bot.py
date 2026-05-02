@@ -76,18 +76,20 @@ class HelpView(discord.ui.View):
 
     def get_main_embed(self):
         embed = discord.Embed(
-            title="🏹 Hunter Bot - Command Center",
-            description="**مرحباً بك في Hunter Bot!**\nاختر الفئة الي عايز تشوف أوامرها من الأزرار تحت ⬇️",
+            title="🏹 Werjo Bot - Command Center",
+            description="**مرحباً بك في Werjo Bot!**\nاختر الفئة الي عايز تشوف أوامرها من الأزرار تحت ⬇️",
             color=0x2B2D31
         )
+        # حساب عدد السيرفرات بداية من 824
+        server_count = len(bot.guilds) + 823
         embed.add_field(
             name="📊 إحصائيات البوت",
-            value=f"🌐 **السيرفرات:** {len(bot.guilds)}\n👥 **المستخدمين:** {len(bot.users)}\n⚡ **الأوامر:** 25+",
+            value=f"🌐 **السيرفرات:** {server_count}\n👥 **المستخدمين:** {len(bot.users)}\n⚡ **الأوامر:** 25+",
             inline=True
         )
         embed.add_field(
             name="🔗 روابط مهمة",
-            value="[دعوة البوت](https://discord.com/api/oauth2/authorize?client_id=YOUR_BOT_ID&permissions=8&scope=bot)\n[سيرفر الدعم](https://discord.gg/support)",
+            value="[دعوة البوت](https://discord.com/api/oauth2/authorize?client_id=YOUR_BOT_ID&permissions=8&scope=bot)\n[سيرفر الدعم](https://discord.gg/dBp2k97Zwz)",
             inline=True
         )
         embed.add_field(
@@ -96,7 +98,7 @@ class HelpView(discord.ui.View):
             inline=True
         )
         embed.set_thumbnail(url=bot.user.avatar.url if bot.user.avatar else None)
-        embed.set_footer(text="Hunter Bot • Developed by werjo", icon_url=bot.user.avatar.url if bot.user.avatar else None)
+        embed.set_footer(text="Werjo Bot • Developed by werjo", icon_url=bot.user.avatar.url if bot.user.avatar else None)
         return embed
 
     def get_music_embed(self):
@@ -238,7 +240,7 @@ class HelpView(discord.ui.View):
     @discord.ui.button(label="🔗 دعوة البوت", style=discord.ButtonStyle.secondary, row=1)
     async def invite_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         embed = discord.Embed(
-            title="🔗 دعوة Hunter Bot",
+            title="🔗 دعوة Werjo Bot",
             description="**اضيف البوت لسيرفرك دلوقتي!**",
             color=0x5865F2
         )
@@ -248,18 +250,23 @@ class HelpView(discord.ui.View):
             inline=False
         )
         embed.add_field(
+            name="🆘 سيرفر الدعم",
+            value="[انضم لسيرفر الدعم](https://discord.gg/dBp2k97Zwz)",
+            inline=False
+        )
+        embed.add_field(
             name="✅ الصلاحيات المطلوبة",
             value="• إدارة السيرفر\n• إدارة الأعضاء\n• إدارة الرسائل\n• الاتصال بـ Voice Channels",
             inline=False
         )
-        embed.set_footer(text="شكراً لاختيارك Hunter Bot!")
+        embed.set_footer(text="شكراً لاختيارك Werjo Bot!")
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @discord.ui.button(label="❌ إغلاق", style=discord.ButtonStyle.danger, row=1)
     async def close_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         embed = discord.Embed(
             title="✅ تم إغلاق القائمة",
-            description="شكراً لاستخدام Hunter Bot!",
+            description="شكراً لاستخدام Werjo Bot!",
             color=0x57F287
         )
         embed.set_footer(text="يمكنك استخدام !help مرة أخرى")
