@@ -137,6 +137,11 @@ class HelpView(discord.ui.View):
             color=0xED4245
         )
         embed.add_field(
+            name="👋 Welcome System",
+            value="`!welcome setup #channel` - إعداد الترحيب\n`!welcome toggle` - تشغيل/إيقاف\n`!welcome title <text>` - تخصيص العنوان\n`!welcome test` - اختبار الرسالة",
+            inline=False
+        )
+        embed.add_field(
             name="🚨 Anti-Scam Protection",
             value="`!antiscam status` - حالة النظام\n`!antiscam toggle` - تشغيل/إيقاف\n`!antiscam whitelist add <domain>` - قائمة بيضاء\n`!antiscam test <text>` - اختبار النظام",
             inline=False
@@ -152,16 +157,11 @@ class HelpView(discord.ui.View):
             inline=False
         )
         embed.add_field(
-            name="👮 أوامر الإدارة",
-            value="`!ban <عضو> [سبب]` - بان عضو\n`!kick <عضو> [سبب]` - طرد عضو\n`!warn <عضو> <سبب>` - إنذار عضو\n`!mute <عضو>` - كتم عضو",
-            inline=False
-        )
-        embed.add_field(
             name="🔍 المراقبة المتقدمة",
-            value="• حماية من الروابط المشبوهة والاحتيال\n• مراقبة دخول/خروج الأعضاء\n• تسجيل تعديل/حذف الرسائل\n• مراقبة تغييرات الأدوار والقنوات",
+            value="• حماية من الروابط المشبوهة والاحتيال\n• نظام ترحيب قابل للتخصيص\n• مراقبة دخول/خروج الأعضاء\n• تسجيل جميع الأنشطة",
             inline=False
         )
-        embed.set_footer(text="حماية 24/7 لسيرفرك من جميع أنواع التهديدات")
+        embed.set_footer(text="حماية وترحيب 24/7 لسيرفرك")
         return embed
 
     def get_moderation_embed(self):
@@ -289,7 +289,7 @@ async def on_command(ctx):
     print(f"[CMD] {ctx.author} used: {ctx.message.content[:50]}")
 
 async def load_cogs():
-    cogs = ["cogs.logging", "cogs.antispam", "cogs.antiraid", "cogs.moderation", "cogs.stats", "cogs.music", "cogs.antiscam"]
+    cogs = ["cogs.logging", "cogs.antispam", "cogs.antiraid", "cogs.moderation", "cogs.stats", "cogs.music", "cogs.antiscam", "cogs.welcome"]
     for cog in cogs:
         await bot.load_extension(cog)
         print(f"  ✔ Loaded {cog}")
