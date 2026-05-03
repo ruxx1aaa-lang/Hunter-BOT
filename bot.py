@@ -137,6 +137,11 @@ class HelpView(discord.ui.View):
             color=0xED4245
         )
         embed.add_field(
+            name="🚨 Anti-Scam Protection",
+            value="`!antiscam status` - حالة النظام\n`!antiscam toggle` - تشغيل/إيقاف\n`!antiscam whitelist add <domain>` - قائمة بيضاء\n`!antiscam test <text>` - اختبار النظام",
+            inline=False
+        )
+        embed.add_field(
             name="🔨 Auto-Ban System",
             value="`!hunt autoban on/off` - تشغيل/إيقاف البان التلقائي\nيبان أي عضو يغادر السيرفر تلقائياً",
             inline=False
@@ -152,11 +157,11 @@ class HelpView(discord.ui.View):
             inline=False
         )
         embed.add_field(
-            name="🔍 المراقبة",
-            value="• مراقبة دخول/خروج الأعضاء\n• تسجيل تعديل/حذف الرسائل\n• مراقبة تغييرات الأدوار والقنوات\n• تتبع الـ Voice Channels",
+            name="🔍 المراقبة المتقدمة",
+            value="• حماية من الروابط المشبوهة والاحتيال\n• مراقبة دخول/خروج الأعضاء\n• تسجيل تعديل/حذف الرسائل\n• مراقبة تغييرات الأدوار والقنوات",
             inline=False
         )
-        embed.set_footer(text="حماية 24/7 لسيرفرك")
+        embed.set_footer(text="حماية 24/7 لسيرفرك من جميع أنواع التهديدات")
         return embed
 
     def get_moderation_embed(self):
@@ -284,7 +289,7 @@ async def on_command(ctx):
     print(f"[CMD] {ctx.author} used: {ctx.message.content[:50]}")
 
 async def load_cogs():
-    cogs = ["cogs.logging", "cogs.antispam", "cogs.antiraid", "cogs.moderation", "cogs.stats", "cogs.music"]
+    cogs = ["cogs.logging", "cogs.antispam", "cogs.antiraid", "cogs.moderation", "cogs.stats", "cogs.music", "cogs.antiscam"]
     for cog in cogs:
         await bot.load_extension(cog)
         print(f"  ✔ Loaded {cog}")
