@@ -104,17 +104,22 @@ class HelpView(discord.ui.View):
     def get_music_embed(self):
         embed = discord.Embed(
             title="🎵 أوامر الموسيقى",
-            description="**نظام موسيقى متطور مع دعم SoundCloud و YouTube**",
+            description="**نظام موسيقى متطور مع دعم YouTube و SoundCloud**",
             color=0x5865F2
         )
         embed.add_field(
             name="🎶 التشغيل الأساسي",
-            value="`!p <اسم/رابط>` - تشغيل أغنية\n`!skip` - تخطي الأغنية\n`!stop` - إيقاف الموسيقى\n`!pause` - إيقاف مؤقت\n`!resume` - استكمال",
+            value="`!p <اسم/رابط>` - تشغيل أغنية (تلقائي)\n`!yt <اسم/رابط>` - تشغيل من YouTube\n`!sc <اسم/رابط>` - تشغيل من SoundCloud\n`!skip` - تخطي الأغنية\n`!stop` - إيقاف الموسيقى",
+            inline=False
+        )
+        embed.add_field(
+            name="⏯️ التحكم",
+            value="`!pause` - إيقاف مؤقت\n`!resume` - استكمال\n`!loop` - تكرار الأغنية\n`!volume <1-100>` - تغيير الصوت",
             inline=False
         )
         embed.add_field(
             name="📋 إدارة القائمة",
-            value="`!queue` - عرض قائمة الأغاني\n`!np` - الأغنية الحالية\n`!loop` - تكرار الأغنية\n`!volume <1-100>` - تغيير الصوت",
+            value="`!queue` - عرض قائمة الأغاني\n`!np` - الأغنية الحالية\n`!join` - دخول voice channel\n`!leave` - خروج من voice channel",
             inline=False
         )
         embed.add_field(
@@ -123,11 +128,11 @@ class HelpView(discord.ui.View):
             inline=False
         )
         embed.add_field(
-            name="🔊 Voice",
-            value="`!join` - دخول voice channel\n`!leave` - خروج من voice channel",
+            name="🔗 الروابط المدعومة",
+            value="• YouTube (youtube.com, youtu.be)\n• SoundCloud (soundcloud.com)\n• روابط مباشرة أخرى\n• البحث بالاسم في كلا المنصتين",
             inline=False
         )
-        embed.set_footer(text="يدعم SoundCloud و YouTube • 24/7 Online")
+        embed.set_footer(text="يدعم YouTube و SoundCloud • 24/7 Online • واجهة تفاعلية")
         return embed
 
     def get_security_embed(self):

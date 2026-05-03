@@ -173,13 +173,30 @@ class MusicCog(commands.Cog, name="Music"):
 
         def _extract():
             with yt_dlp.YoutubeDL(YDL_OPTIONS) as ydl:
+                # فحص إذا كان الـ query رابط YouTube
                 if "youtube.com" in query or "youtu.be" in query:
                     opts = YDL_OPTIONS.copy()
                     opts["cookiefile"] = COOKIES_FILE
                     opts["extractor_args"] = {"youtube": {"player_client": ["android", "web_creator"]}}
                     with yt_dlp.YoutubeDL(opts) as ydl2:
                         info = ydl2.extract_info(query, download=False)
+                # فحص إذا كان رابط SoundCloud
+                elif "soundcloud.com" in query:
+                    info = ydl.extract_info(query, download=False)
+                # فحص إذا كان رابط مباشر آخر
+                elif query.startswith("http"):
+                    try:
+                        info = ydl.extract_info(query, download=False)
+                        # إذا كان playlist، خد أول أغنية
+                        if info and "entries" in info and info["entries"]:
+                            info = info["entries"][0]
+                    except:
+                        # إذا فشل، جرب كـ YouTube search
+                        info = ydl.extract_info(f"ytsearch:{query}", download=False)
+                        if info and "entries" in info and info["entries"]:
+                            info = info["entries"][0]
                 else:
+                    # بحث عادي في SoundCloud أولاً
                     if not query.startswith("http"):
                         info = ydl.extract_info(f"scsearch:{query}", download=False)
                         if info and "entries" in info and info["entries"]:
@@ -210,6 +227,7 @@ class MusicCog(commands.Cog, name="Music"):
                     "webpage_url": info.get("webpage_url", ""),
                     "thumbnail": info.get("thumbnail", ""),
                     "uploader": info.get("uploader", "Unknown"),
+                    "source": "YouTube" if "youtube" in info.get("webpage_url", "") else "SoundCloud" if "soundcloud" in info.get("webpage_url", "") else "Other"
                 }
 
         try:
@@ -227,6 +245,12 @@ class MusicCog(commands.Cog, name="Music"):
         embed.add_field(name="👤 الفنان", value=track["uploader"] or "Unknown", inline=True)
         embed.add_field(name="⏱ المدة", value=self.fmt(track["duration"]), inline=True)
         embed.add_field(name="🔂 تكرار", value="شغال ✅" if loop else "وقف ❌", inline=True)
+        
+        # إضافة مصدر الأغنية
+        source = track.get("source", "Unknown")
+        source_emoji = "🔴" if source == "YouTube" else "🟠" if source == "SoundCloud" else "🎵"
+        embed.add_field(name="📡 المصدر", value=f"{source_emoji} {source}", inline=True)
+        
         embed.set_footer(text=f"📋 {queue_len} أغنية في الـ queue")
         if track.get("thumbnail"):
             embed.set_thumbnail(url=track["thumbnail"])
@@ -272,7 +296,7 @@ class MusicCog(commands.Cog, name="Music"):
 
     @commands.command(name="p", aliases=["play", "شغل"])
     async def play(self, ctx: commands.Context, *, query: str):
-        """يشغل أغنية | !p <اسم أو رابط>"""
+        """يشغل أغنية | !p <اسم أو رابط YouTube/SoundCloud>"""
         if not ctx.author.voice:
             return await ctx.send("❌ لازم تكون في فويس شانل الأول!")
 
@@ -284,12 +308,22 @@ class MusicCog(commands.Cog, name="Music"):
         elif vc.channel != channel:
             await vc.move_to(channel); await vc.guild.change_voice_state(channel=channel, self_deaf=True)
 
-        loading = await ctx.send("🔍 بدور على الأغنية...")
+        # تحديد نوع البحث حسب الـ query
+        if query.startswith("http"):
+            loading_msg = "🔗 بحمل من الرابط..."
+        elif "youtube.com" in query or "youtu.be" in query:
+            loading_msg = "🔴 بحمل من YouTube..."
+        elif "soundcloud.com" in query:
+            loading_msg = "🟠 بحمل من SoundCloud..."
+        else:
+            loading_msg = "🔍 بدور على الأغنية..."
+            
+        loading = await ctx.send(loading_msg)
         track = await self.search_and_extract(query)
         await loading.delete()
 
         if not track or not track.get("url"):
-            return await ctx.send("❌ مش لاقي الأغنية دي، جرب اسم تاني.")
+            return await ctx.send("❌ مش لاقي الأغنية دي، جرب اسم تاني أو رابط صحيح.")
 
         queue = self.get_queue(ctx.guild.id)
 
@@ -310,12 +344,16 @@ class MusicCog(commands.Cog, name="Music"):
             await ctx.send(embed=embed, view=view)
         else:
             queue.append(track)
+            source = track.get("source", "Unknown")
+            source_emoji = "🔴" if source == "YouTube" else "🟠" if source == "SoundCloud" else "🎵"
+            
             embed = discord.Embed(
                 description=f"### ➕ اتضافت للـ Queue\n**[{track['title']}]({track['webpage_url']})**",
                 color=0x5865F2,
             )
             embed.add_field(name="⏱ المدة", value=self.fmt(track["duration"]), inline=True)
             embed.add_field(name="📋 موقعها", value=f"#{len(queue)}", inline=True)
+            embed.add_field(name="📡 المصدر", value=f"{source_emoji} {source}", inline=True)
             if track.get("thumbnail"):
                 embed.set_thumbnail(url=track["thumbnail"])
             await ctx.send(embed=embed)
@@ -421,6 +459,161 @@ class MusicCog(commands.Cog, name="Music"):
         self.current.pop(ctx.guild.id, None)
         await vc.disconnect()
         await ctx.send("👋 خرجت من الفويس شانل.")
+
+    @commands.command(name="yt", aliases=["youtube"])
+    async def youtube_play(self, ctx: commands.Context, *, query: str):
+        """يشغل أغنية من YouTube مباشرة | !yt <اسم أو رابط>"""
+        if not ctx.author.voice:
+            return await ctx.send("❌ لازم تكون في فويس شانل الأول!")
+
+        channel = ctx.author.voice.channel
+        vc = ctx.voice_client
+
+        if not vc:
+            vc = await channel.connect(self_deaf=True)
+        elif vc.channel != channel:
+            await vc.move_to(channel); await vc.guild.change_voice_state(channel=channel, self_deaf=True)
+
+        # فرض البحث في YouTube
+        if not query.startswith("http"):
+            query = f"ytsearch:{query}"
+        
+        loading = await ctx.send("🔴 بحمل من YouTube...")
+        
+        # استخدام إعدادات YouTube مباشرة
+        loop = asyncio.get_event_loop()
+        
+        def _extract_youtube():
+            opts = YDL_OPTIONS.copy()
+            opts["cookiefile"] = COOKIES_FILE
+            opts["extractor_args"] = {"youtube": {"player_client": ["android", "web_creator"]}}
+            opts["default_search"] = "ytsearch"
+            
+            with yt_dlp.YoutubeDL(opts) as ydl:
+                info = ydl.extract_info(query, download=False)
+                if info and "entries" in info and info["entries"]:
+                    info = info["entries"][0]
+                elif not info:
+                    return None
+
+                url = None
+                formats = info.get("formats", [])
+                for f in reversed(formats):
+                    if f.get("acodec") != "none" and f.get("vcodec") == "none":
+                        url = f.get("url")
+                        break
+                if not url:
+                    url = info.get("url")
+                if not url and formats:
+                    url = formats[-1].get("url")
+
+                return {
+                    "url": url,
+                    "title": info.get("title", "Unknown"),
+                    "duration": info.get("duration", 0),
+                    "webpage_url": info.get("webpage_url", ""),
+                    "thumbnail": info.get("thumbnail", ""),
+                    "uploader": info.get("uploader", "Unknown"),
+                    "source": "YouTube"
+                }
+        
+        try:
+            track = await loop.run_in_executor(None, _extract_youtube)
+        except Exception as e:
+            print(f"[Music] YouTube error: {e}")
+            track = None
+            
+        await loading.delete()
+
+        if not track or not track.get("url"):
+            return await ctx.send("❌ مش لاقي الأغنية دي على YouTube، جرب اسم تاني.")
+
+        queue = self.get_queue(ctx.guild.id)
+
+        if not vc.is_playing() and not vc.is_paused():
+            self.current[ctx.guild.id] = track
+
+            def after(error):
+                if error:
+                    print(f"[Music] Player error: {error}")
+                asyncio.run_coroutine_threadsafe(self.play_next(ctx), self.bot.loop)
+
+            source = discord.FFmpegPCMAudio(track["url"], **FFMPEG_OPTIONS)
+            source = discord.PCMVolumeTransformer(source, volume=0.8)
+            vc.play(source, after=after)
+
+            embed = self.build_now_playing_embed(track, len(queue), self.loop_mode.get(ctx.guild.id, False))
+            view = PlayerView(self, ctx)
+            await ctx.send(embed=embed, view=view)
+        else:
+            queue.append(track)
+            embed = discord.Embed(
+                description=f"### ➕ اتضافت للـ Queue من YouTube\n**[{track['title']}]({track['webpage_url']})**",
+                color=0xFF0000,
+            )
+            embed.add_field(name="⏱ المدة", value=self.fmt(track["duration"]), inline=True)
+            embed.add_field(name="📋 موقعها", value=f"#{len(queue)}", inline=True)
+            embed.add_field(name="📡 المصدر", value="🔴 YouTube", inline=True)
+            if track.get("thumbnail"):
+                embed.set_thumbnail(url=track["thumbnail"])
+            await ctx.send(embed=embed)
+
+    @commands.command(name="sc", aliases=["soundcloud"])
+    async def soundcloud_play(self, ctx: commands.Context, *, query: str):
+        """يشغل أغنية من SoundCloud مباشرة | !sc <اسم أو رابط>"""
+        if not ctx.author.voice:
+            return await ctx.send("❌ لازم تكون في فويس شانل الأول!")
+
+        channel = ctx.author.voice.channel
+        vc = ctx.voice_client
+
+        if not vc:
+            vc = await channel.connect(self_deaf=True)
+        elif vc.channel != channel:
+            await vc.move_to(channel); await vc.guild.change_voice_state(channel=channel, self_deaf=True)
+
+        # فرض البحث في SoundCloud
+        if not query.startswith("http"):
+            query = f"scsearch:{query}"
+        
+        loading = await ctx.send("🟠 بحمل من SoundCloud...")
+        track = await self.search_and_extract(query)
+        await loading.delete()
+
+        if not track or not track.get("url"):
+            return await ctx.send("❌ مش لاقي الأغنية دي على SoundCloud، جرب اسم تاني.")
+
+        # تأكد إن المصدر SoundCloud
+        track["source"] = "SoundCloud"
+        queue = self.get_queue(ctx.guild.id)
+
+        if not vc.is_playing() and not vc.is_paused():
+            self.current[ctx.guild.id] = track
+
+            def after(error):
+                if error:
+                    print(f"[Music] Player error: {error}")
+                asyncio.run_coroutine_threadsafe(self.play_next(ctx), self.bot.loop)
+
+            source = discord.FFmpegPCMAudio(track["url"], **FFMPEG_OPTIONS)
+            source = discord.PCMVolumeTransformer(source, volume=0.8)
+            vc.play(source, after=after)
+
+            embed = self.build_now_playing_embed(track, len(queue), self.loop_mode.get(ctx.guild.id, False))
+            view = PlayerView(self, ctx)
+            await ctx.send(embed=embed, view=view)
+        else:
+            queue.append(track)
+            embed = discord.Embed(
+                description=f"### ➕ اتضافت للـ Queue من SoundCloud\n**[{track['title']}]({track['webpage_url']})**",
+                color=0xFF8C00,
+            )
+            embed.add_field(name="⏱ المدة", value=self.fmt(track["duration"]), inline=True)
+            embed.add_field(name="📋 موقعها", value=f"#{len(queue)}", inline=True)
+            embed.add_field(name="📡 المصدر", value="🟠 SoundCloud", inline=True)
+            if track.get("thumbnail"):
+                embed.set_thumbnail(url=track["thumbnail"])
+            await ctx.send(embed=embed)
 
     # ─── Playlist Commands ─────────────────────────────────────────────────
 
