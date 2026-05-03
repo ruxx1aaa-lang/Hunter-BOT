@@ -8,6 +8,21 @@ import shutil
 import json
 import subprocess
 from collections import deque
+import sys
+
+# ─── Auto-Update yt-dlp ────────────────────────────────────────────────────
+async def update_ytdlp():
+    """تحديث yt-dlp تلقائياً"""
+    try:
+        print("[Music] Checking for yt-dlp updates...")
+        result = subprocess.run([sys.executable, "-m", "pip", "install", "-U", "yt-dlp"], 
+                              capture_output=True, text=True, timeout=60)
+        if result.returncode == 0:
+            print("[Music] yt-dlp updated successfully")
+        else:
+            print(f"[Music] yt-dlp update failed: {result.stderr}")
+    except Exception as e:
+        print(f"[Music] yt-dlp update error: {e}")
 
 # ─── Cookies ───────────────────────────────────────────────────────────────
 _cookies_content = os.getenv("YOUTUBE_COOKIES", "")
@@ -155,6 +170,24 @@ class MusicCog(commands.Cog, name="Music"):
         self.queues: dict[int, deque] = {}
         self.current: dict[int, dict] = {}
         self.loop_mode: dict[int, bool] = {}
+        self.youtube_blocked = False  # تتبع حالة حظر YouTube
+        self.last_ytdlp_update = 0  # آخر تحديث لـ yt-dlp
+        
+        # تحديث yt-dlp عند بدء التشغيل
+        asyncio.create_task(self.startup_update())
+
+    async def startup_update(self):
+        """تحديث yt-dlp عند بدء التشغيل"""
+        await asyncio.sleep(5)  # انتظار حتى يكتمل تحميل البوت
+        await update_ytdlp()
+        self.last_ytdlp_update = asyncio.get_event_loop().time()
+
+    async def check_ytdlp_update(self):
+        """فحص الحاجة لتحديث yt-dlp (كل 6 ساعات)"""
+        current_time = asyncio.get_event_loop().time()
+        if current_time - self.last_ytdlp_update > 21600:  # 6 ساعات
+            await update_ytdlp()
+            self.last_ytdlp_update = current_time
 
     def get_queue(self, guild_id: int) -> deque:
         if guild_id not in self.queues:
@@ -168,74 +201,120 @@ class MusicCog(commands.Cog, name="Music"):
         h, m = divmod(m, 60)
         return f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
 
-    async def search_and_extract(self, query: str) -> dict | None:
+    async def search_and_extract(self, query: str, force_platform: str = None) -> dict | None:
+        """استخراج الأغاني مع نظام fallback ذكي"""
         loop = asyncio.get_event_loop()
+        
+        # فحص تحديث yt-dlp
+        await self.check_ytdlp_update()
 
         def _extract():
-            with yt_dlp.YoutubeDL(YDL_OPTIONS) as ydl:
-                # فحص إذا كان الـ query رابط YouTube
-                if "youtube.com" in query or "youtu.be" in query:
+            # تحديد المنصة
+            is_youtube = "youtube.com" in query or "youtu.be" in query or force_platform == "youtube"
+            is_soundcloud = "soundcloud.com" in query or force_platform == "soundcloud"
+            is_direct_link = query.startswith("http") and not is_youtube and not is_soundcloud
+            
+            # محاولة YouTube أولاً (إذا كان مطلوب)
+            if is_youtube and not self.youtube_blocked:
+                try:
+                    opts = YDL_OPTIONS.copy()
+                    opts["cookiefile"] = COOKIES_FILE
+                    opts["extractor_args"] = {"youtube": {"player_client": ["android", "web_creator", "ios"]}}
+                    
+                    with yt_dlp.YoutubeDL(opts) as ydl:
+                        info = ydl.extract_info(query, download=False)
+                        if info:
+                            return self._process_info(info, "YouTube")
+                except Exception as e:
+                    print(f"[Music] YouTube extraction failed: {e}")
+                    if "blocked" in str(e).lower() or "unavailable" in str(e).lower():
+                        self.youtube_blocked = True
+                        print("[Music] YouTube appears to be blocked, switching to SoundCloud")
+            
+            # محاولة SoundCloud
+            if not is_direct_link:
+                try:
+                    search_query = query
+                    if not query.startswith("http"):
+                        search_query = f"scsearch:{query}"
+                    
+                    with yt_dlp.YoutubeDL(YDL_OPTIONS) as ydl:
+                        info = ydl.extract_info(search_query, download=False)
+                        if info and "entries" in info and info["entries"]:
+                            return self._process_info(info["entries"][0], "SoundCloud")
+                        elif info:
+                            return self._process_info(info, "SoundCloud")
+                except Exception as e:
+                    print(f"[Music] SoundCloud extraction failed: {e}")
+            
+            # محاولة الروابط المباشرة
+            if is_direct_link:
+                try:
+                    with yt_dlp.YoutubeDL(YDL_OPTIONS) as ydl:
+                        info = ydl.extract_info(query, download=False)
+                        if info:
+                            return self._process_info(info, "Direct")
+                except Exception as e:
+                    print(f"[Music] Direct link extraction failed: {e}")
+            
+            # Fallback: محاولة YouTube مرة أخرى إذا فشل كل شيء
+            if not is_youtube and not self.youtube_blocked:
+                try:
+                    search_query = f"ytsearch:{query}" if not query.startswith("http") else query
                     opts = YDL_OPTIONS.copy()
                     opts["cookiefile"] = COOKIES_FILE
                     opts["extractor_args"] = {"youtube": {"player_client": ["android", "web_creator"]}}
-                    with yt_dlp.YoutubeDL(opts) as ydl2:
-                        info = ydl2.extract_info(query, download=False)
-                # فحص إذا كان رابط SoundCloud
-                elif "soundcloud.com" in query:
-                    info = ydl.extract_info(query, download=False)
-                # فحص إذا كان رابط مباشر آخر
-                elif query.startswith("http"):
-                    try:
-                        info = ydl.extract_info(query, download=False)
-                        # إذا كان playlist، خد أول أغنية
+                    
+                    with yt_dlp.YoutubeDL(opts) as ydl:
+                        info = ydl.extract_info(search_query, download=False)
                         if info and "entries" in info and info["entries"]:
-                            info = info["entries"][0]
-                    except:
-                        # إذا فشل، جرب كـ YouTube search
-                        info = ydl.extract_info(f"ytsearch:{query}", download=False)
-                        if info and "entries" in info and info["entries"]:
-                            info = info["entries"][0]
-                else:
-                    # بحث عادي في SoundCloud أولاً
-                    if not query.startswith("http"):
-                        info = ydl.extract_info(f"scsearch:{query}", download=False)
-                        if info and "entries" in info and info["entries"]:
-                            info = info["entries"][0]
-                    else:
-                        info = ydl.extract_info(query, download=False)
-                        if info and "entries" in info:
-                            info = info["entries"][0]
-
-                if not info:
-                    return None
-
-                url = None
-                formats = info.get("formats", [])
-                for f in reversed(formats):
-                    if f.get("acodec") != "none" and f.get("vcodec") == "none":
-                        url = f.get("url")
-                        break
-                if not url:
-                    url = info.get("url")
-                if not url and formats:
-                    url = formats[-1].get("url")
-
-                return {
-                    "url": url,
-                    "title": info.get("title", "Unknown"),
-                    "duration": info.get("duration", 0),
-                    "webpage_url": info.get("webpage_url", ""),
-                    "thumbnail": info.get("thumbnail", ""),
-                    "uploader": info.get("uploader", "Unknown"),
-                    "source": "YouTube" if "youtube" in info.get("webpage_url", "") else "SoundCloud" if "soundcloud" in info.get("webpage_url", "") else "Other"
-                }
+                            return self._process_info(info["entries"][0], "YouTube")
+                        elif info:
+                            return self._process_info(info, "YouTube")
+                except Exception as e:
+                    print(f"[Music] YouTube fallback failed: {e}")
+            
+            return None
 
         try:
             result = await loop.run_in_executor(None, _extract)
+            if result:
+                # إعادة تعيين حالة الحظر إذا نجحت العملية
+                if result.get("source") == "YouTube":
+                    self.youtube_blocked = False
             return result
         except Exception as e:
-            print(f"[Music] Error: {e}")
+            print(f"[Music] Extraction error: {e}")
             return None
+
+    def _process_info(self, info: dict, source: str) -> dict:
+        """معالجة معلومات الأغنية"""
+        if not info:
+            return None
+
+        url = None
+        formats = info.get("formats", [])
+        
+        # البحث عن أفضل format صوتي
+        for f in reversed(formats):
+            if f.get("acodec") != "none" and f.get("vcodec") == "none":
+                url = f.get("url")
+                break
+        
+        if not url:
+            url = info.get("url")
+        if not url and formats:
+            url = formats[-1].get("url")
+
+        return {
+            "url": url,
+            "title": info.get("title", "Unknown"),
+            "duration": info.get("duration", 0),
+            "webpage_url": info.get("webpage_url", ""),
+            "thumbnail": info.get("thumbnail", ""),
+            "uploader": info.get("uploader", "Unknown"),
+            "source": source
+        }
 
     def build_now_playing_embed(self, track: dict, queue_len: int, loop: bool) -> discord.Embed:
         embed = discord.Embed(
@@ -474,59 +553,21 @@ class MusicCog(commands.Cog, name="Music"):
         elif vc.channel != channel:
             await vc.move_to(channel); await vc.guild.change_voice_state(channel=channel, self_deaf=True)
 
-        # فرض البحث في YouTube
-        if not query.startswith("http"):
-            query = f"ytsearch:{query}"
+        if self.youtube_blocked:
+            return await ctx.send("⚠️ YouTube محظور حالياً، استخدم `!sc` للبحث في SoundCloud أو `!p` للبحث التلقائي.")
         
         loading = await ctx.send("🔴 بحمل من YouTube...")
-        
-        # استخدام إعدادات YouTube مباشرة
-        loop = asyncio.get_event_loop()
-        
-        def _extract_youtube():
-            opts = YDL_OPTIONS.copy()
-            opts["cookiefile"] = COOKIES_FILE
-            opts["extractor_args"] = {"youtube": {"player_client": ["android", "web_creator"]}}
-            opts["default_search"] = "ytsearch"
-            
-            with yt_dlp.YoutubeDL(opts) as ydl:
-                info = ydl.extract_info(query, download=False)
-                if info and "entries" in info and info["entries"]:
-                    info = info["entries"][0]
-                elif not info:
-                    return None
-
-                url = None
-                formats = info.get("formats", [])
-                for f in reversed(formats):
-                    if f.get("acodec") != "none" and f.get("vcodec") == "none":
-                        url = f.get("url")
-                        break
-                if not url:
-                    url = info.get("url")
-                if not url and formats:
-                    url = formats[-1].get("url")
-
-                return {
-                    "url": url,
-                    "title": info.get("title", "Unknown"),
-                    "duration": info.get("duration", 0),
-                    "webpage_url": info.get("webpage_url", ""),
-                    "thumbnail": info.get("thumbnail", ""),
-                    "uploader": info.get("uploader", "Unknown"),
-                    "source": "YouTube"
-                }
-        
-        try:
-            track = await loop.run_in_executor(None, _extract_youtube)
-        except Exception as e:
-            print(f"[Music] YouTube error: {e}")
-            track = None
-            
+        track = await self.search_and_extract(query, force_platform="youtube")
         await loading.delete()
 
         if not track or not track.get("url"):
-            return await ctx.send("❌ مش لاقي الأغنية دي على YouTube، جرب اسم تاني.")
+            # محاولة fallback لـ SoundCloud
+            loading2 = await ctx.send("❌ فشل YouTube، جاري المحاولة في SoundCloud...")
+            track = await self.search_and_extract(query, force_platform="soundcloud")
+            await loading2.delete()
+            
+            if not track:
+                return await ctx.send("❌ مش لاقي الأغنية دي في أي منصة، جرب اسم تاني.")
 
         queue = self.get_queue(ctx.guild.id)
 
@@ -547,13 +588,16 @@ class MusicCog(commands.Cog, name="Music"):
             await ctx.send(embed=embed, view=view)
         else:
             queue.append(track)
+            source_color = 0xFF0000 if track.get("source") == "YouTube" else 0xFF8C00
+            source_emoji = "🔴" if track.get("source") == "YouTube" else "🟠"
+            
             embed = discord.Embed(
-                description=f"### ➕ اتضافت للـ Queue من YouTube\n**[{track['title']}]({track['webpage_url']})**",
-                color=0xFF0000,
+                description=f"### ➕ اتضافت للـ Queue من {track.get('source', 'Unknown')}\n**[{track['title']}]({track['webpage_url']})**",
+                color=source_color,
             )
             embed.add_field(name="⏱ المدة", value=self.fmt(track["duration"]), inline=True)
             embed.add_field(name="📋 موقعها", value=f"#{len(queue)}", inline=True)
-            embed.add_field(name="📡 المصدر", value="🔴 YouTube", inline=True)
+            embed.add_field(name="📡 المصدر", value=f"{source_emoji} {track.get('source', 'Unknown')}", inline=True)
             if track.get("thumbnail"):
                 embed.set_thumbnail(url=track["thumbnail"])
             await ctx.send(embed=embed)
@@ -572,19 +616,13 @@ class MusicCog(commands.Cog, name="Music"):
         elif vc.channel != channel:
             await vc.move_to(channel); await vc.guild.change_voice_state(channel=channel, self_deaf=True)
 
-        # فرض البحث في SoundCloud
-        if not query.startswith("http"):
-            query = f"scsearch:{query}"
-        
         loading = await ctx.send("🟠 بحمل من SoundCloud...")
-        track = await self.search_and_extract(query)
+        track = await self.search_and_extract(query, force_platform="soundcloud")
         await loading.delete()
 
         if not track or not track.get("url"):
             return await ctx.send("❌ مش لاقي الأغنية دي على SoundCloud، جرب اسم تاني.")
 
-        # تأكد إن المصدر SoundCloud
-        track["source"] = "SoundCloud"
         queue = self.get_queue(ctx.guild.id)
 
         if not vc.is_playing() and not vc.is_paused():
@@ -614,6 +652,68 @@ class MusicCog(commands.Cog, name="Music"):
             if track.get("thumbnail"):
                 embed.set_thumbnail(url=track["thumbnail"])
             await ctx.send(embed=embed)
+
+    @commands.command(name="update-ytdlp")
+    @commands.has_permissions(administrator=True)
+    async def update_ytdlp_command(self, ctx):
+        """تحديث yt-dlp يدوياً (للمشرفين فقط)"""
+        loading = await ctx.send("🔄 جاري تحديث yt-dlp...")
+        
+        try:
+            await update_ytdlp()
+            self.last_ytdlp_update = asyncio.get_event_loop().time()
+            self.youtube_blocked = False  # إعادة تعيين حالة الحظر
+            
+            embed = discord.Embed(
+                title="✅ تم تحديث yt-dlp بنجاح",
+                description="تم تحديث مكتبة استخراج الفيديو، جرب تشغيل الأغاني مرة أخرى",
+                color=discord.Color.green()
+            )
+            await loading.edit(content=None, embed=embed)
+        except Exception as e:
+            embed = discord.Embed(
+                title="❌ فشل تحديث yt-dlp",
+                description=f"حدث خطأ أثناء التحديث: {str(e)[:200]}",
+                color=discord.Color.red()
+            )
+            await loading.edit(content=None, embed=embed)
+
+    @commands.command(name="music-status")
+    async def music_status(self, ctx):
+        """عرض حالة نظام الموسيقى"""
+        embed = discord.Embed(
+            title="🎵 حالة نظام الموسيقى",
+            color=discord.Color.blue()
+        )
+        
+        # حالة YouTube
+        yt_status = "❌ محظور" if self.youtube_blocked else "✅ يعمل"
+        embed.add_field(name="🔴 YouTube", value=yt_status, inline=True)
+        
+        # حالة SoundCloud
+        embed.add_field(name="🟠 SoundCloud", value="✅ يعمل", inline=True)
+        
+        # آخر تحديث
+        import time
+        last_update = time.time() - self.last_ytdlp_update
+        hours = int(last_update // 3600)
+        embed.add_field(name="🔄 آخر تحديث", value=f"منذ {hours} ساعة", inline=True)
+        
+        # إحصائيات
+        total_guilds = len(self.queues)
+        active_players = sum(1 for guild_id in self.queues if self.current.get(guild_id))
+        
+        embed.add_field(name="📊 الإحصائيات", 
+                       value=f"السيرفرات: {total_guilds}\nالمشغلات النشطة: {active_players}", 
+                       inline=False)
+        
+        if self.youtube_blocked:
+            embed.add_field(name="⚠️ تحذير", 
+                           value="YouTube محظور حالياً، استخدم `!update-ytdlp` للمحاولة مرة أخرى", 
+                           inline=False)
+        
+        embed.set_footer(text="استخدم !update-ytdlp لتحديث النظام يدوياً")
+        await ctx.send(embed=embed)
 
     # ─── Playlist Commands ─────────────────────────────────────────────────
 
