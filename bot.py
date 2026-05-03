@@ -104,35 +104,30 @@ class HelpView(discord.ui.View):
     def get_music_embed(self):
         embed = discord.Embed(
             title="🎵 أوامر الموسيقى",
-            description="**نظام موسيقى متطور مع حماية من حظر YouTube**",
-            color=0x5865F2
+            description="**نظام موسيقى بسيط من SoundCloud (مؤقتاً)**",
+            color=0xFF8C00
         )
         embed.add_field(
             name="🎶 التشغيل الأساسي",
-            value="`!p <اسم/رابط>` - تشغيل أغنية (تلقائي مع fallback)\n`!yt <اسم/رابط>` - تشغيل من YouTube\n`!sc <اسم/رابط>` - تشغيل من SoundCloud\n`!skip` - تخطي الأغنية\n`!stop` - إيقاف الموسيقى",
-            inline=False
-        )
-        embed.add_field(
-            name="⏯️ التحكم",
-            value="`!pause` - إيقاف مؤقت\n`!resume` - استكمال\n`!loop` - تكرار الأغنية\n`!volume <1-100>` - تغيير الصوت",
+            value="`!p <اسم أو رابط>` - تشغيل أغنية من SoundCloud\n`!skip` - تخطي الأغنية\n`!stop` - إيقاف الموسيقى\n`!pause` - إيقاف مؤقت\n`!resume` - استكمال",
             inline=False
         )
         embed.add_field(
             name="📋 إدارة القائمة",
-            value="`!queue` - عرض قائمة الأغاني\n`!np` - الأغنية الحالية\n`!join` - دخول voice channel\n`!leave` - خروج من voice channel",
+            value="`!queue` - عرض قائمة الأغاني\n`!np` - الأغنية الحالية\n`!loop` - تكرار الأغنية\n`!volume <1-100>` - تغيير الصوت",
             inline=False
         )
         embed.add_field(
-            name="🔧 صيانة النظام",
-            value="`!music-status` - حالة النظام\n`!update-ytdlp` - تحديث yt-dlp (مشرفين)\n**تحديث تلقائي كل 6 ساعات**",
+            name="🔊 Voice",
+            value="`!join` - دخول voice channel\n`!leave` - خروج من voice channel",
             inline=False
         )
         embed.add_field(
-            name="🛡️ حماية من الحظر",
-            value="• نظام fallback ذكي\n• تحديث تلقائي لـ yt-dlp\n• كشف حظر YouTube تلقائياً\n• تبديل تلقائي لـ SoundCloud",
+            name="🟠 المصدر الحالي",
+            value="**SoundCloud فقط** (مؤقتاً)\nيتم العمل على حل مشاكل YouTube",
             inline=False
         )
-        embed.set_footer(text="نظام محمي ضد حظر YouTube • تحديث تلقائي • fallback ذكي")
+        embed.set_footer(text="SoundCloud Only • 24/7 Online • واجهة تفاعلية")
         return embed
 
     def get_security_embed(self):
