@@ -172,7 +172,7 @@ class HelpView(discord.ui.View):
         )
         embed.add_field(
             name="👋 التحيات والتفاعل",
-            value="`!greet @عضو` - تحية جميلة\n`!welcome @عضو` - ترحيب بعضو جديد\n`!hug @عضو` - حضن دافي\n`!pat @عضو` - ربتة حلوة",
+            value="`!greet @عضو` - تحية جميلة\n`!greet-welcome @عضو` - ترحيب بعضو جديد\n`!hug @عضو` - حضن دافي\n`!pat @عضو` - ربتة حلوة",
             inline=False
         )
         embed.add_field(

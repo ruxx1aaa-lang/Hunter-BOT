@@ -156,11 +156,11 @@ class GreetingsCog(commands.Cog):
         
         await ctx.send(embed=embed)
 
-    @commands.command(name="welcome", aliases=["ترحيب"])
-    async def welcome_user(self, ctx, member: discord.Member = None):
-        """ترحيب خاص بالأعضاء الجدد | !welcome @عضو"""
+    @commands.command(name="greet-welcome", aliases=["ترحيب-خاص"])
+    async def greet_welcome_user(self, ctx, member: discord.Member = None):
+        """ترحيب خاص بالأعضاء الجدد | !greet-welcome @عضو"""
         if member is None:
-            return await ctx.send("❌ لازم تمنشن العضو الي عايز ترحب بيه!\nمثال: `!welcome @العضو`")
+            return await ctx.send("❌ لازم تمنشن العضو الي عايز ترحب بيه!\nمثال: `!greet-welcome @العضو`")
         
         if member.bot:
             return await ctx.send("🤖 البوتات مش محتاجة ترحيب!")
@@ -326,7 +326,7 @@ class GreetingsCog(commands.Cog):
         
         embed.add_field(
             name="🎉 التحيات الأساسية",
-            value="`!greet @عضو` - تحية جميلة\n`!welcome @عضو` - ترحيب بعضو جديد\n`!goodbye @عضو` - وداع عضو",
+            value="`!greet @عضو` - تحية جميلة\n`!greet-welcome @عضو` - ترحيب بعضو جديد\n`!goodbye @عضو` - وداع عضو",
             inline=False
         )
         
@@ -344,7 +344,7 @@ class GreetingsCog(commands.Cog):
         
         embed.add_field(
             name="🎯 أمثلة",
-            value="`!greet @werjo` - تحية لـ werjo\n`!hug @صديق` - حضن لصديق\n`!welcome @عضو_جديد` - ترحيب",
+            value="`!greet @werjo` - تحية لـ werjo\n`!hug @صديق` - حضن لصديق\n`!greet-welcome @عضو_جديد` - ترحيب",
             inline=False
         )
         
