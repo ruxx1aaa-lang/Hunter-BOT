@@ -166,9 +166,14 @@ class HelpView(discord.ui.View):
 
     def get_moderation_embed(self):
         embed = discord.Embed(
-            title="👮 أوامر الإدارة",
-            description="**أدوات إدارة قوية للمشرفين**",
+            title="👮 أوامر الإدارة والتفاعل",
+            description="**أدوات إدارة قوية وتفاعل اجتماعي**",
             color=0xFEE75C
+        )
+        embed.add_field(
+            name="👋 التحيات والتفاعل",
+            value="`!greet @عضو` - تحية جميلة\n`!welcome @عضو` - ترحيب بعضو جديد\n`!hug @عضو` - حضن دافي\n`!pat @عضو` - ربتة حلوة",
+            inline=False
         )
         embed.add_field(
             name="🔨 العقوبات",
@@ -190,7 +195,7 @@ class HelpView(discord.ui.View):
             value="`!clear <عدد>` - حذف رسائل\n`!purge <عضو> <عدد>` - حذف رسائل عضو معين",
             inline=False
         )
-        embed.set_footer(text="صلاحيات الإدارة مطلوبة")
+        embed.set_footer(text="صلاحيات الإدارة مطلوبة للعقوبات • التحيات متاحة للجميع")
         return embed
 
     def get_stats_embed(self):
@@ -289,7 +294,7 @@ async def on_command(ctx):
     print(f"[CMD] {ctx.author} used: {ctx.message.content[:50]}")
 
 async def load_cogs():
-    cogs = ["cogs.logging", "cogs.antispam", "cogs.antiraid", "cogs.moderation", "cogs.stats", "cogs.music", "cogs.antiscam", "cogs.welcome"]
+    cogs = ["cogs.logging", "cogs.antispam", "cogs.antiraid", "cogs.moderation", "cogs.stats", "cogs.music", "cogs.antiscam", "cogs.welcome", "cogs.greetings"]
     for cog in cogs:
         await bot.load_extension(cog)
         print(f"  ✔ Loaded {cog}")
