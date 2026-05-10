@@ -62,8 +62,28 @@ async def on_message(message):
     if message.author.bot:
         return
     
-    # فحص إذا كانت الرسالة أمر للبوت
+    # فحص الـ cooldown العام للأوامر (منع spam)
     ctx = await bot.get_context(message)
+    if ctx.valid and ctx.command:
+        import time
+        user_id = message.author.id
+        now = time.time()
+        
+        # cooldown عام للأوامر (2 ثانية)
+        if user_id in command_cooldown:
+            if now - command_cooldown[user_id] < 2:  # 2 ثانية cooldown
+                try:
+                    await message.delete()
+                except:
+                    pass
+                return
+        
+        command_cooldown[user_id] = now
+    
+    # معالجة الأوامر أولاً
+    await bot.process_commands(message)
+    
+    # بعدين فحص إذا كانت الرسالة أمر للبوت للحذف
     if ctx.valid and ctx.command:
         guild_id = message.guild.id if message.guild else None
         
@@ -73,7 +93,7 @@ async def on_message(message):
             excluded = excluded_commands.get(guild_id, ['p', 'play', 'help', 'مساعدة', 'h'])
             
             # إذا لم يكن الأمر في قائمة الاستثناءات، احذف الرسالة
-            if ctx.command.name not in excluded:
+            if ctx.command.name not in excluded and not any(alias in excluded for alias in ctx.command.aliases):
                 try:
                     await message.delete()
                 except discord.NotFound:
@@ -82,7 +102,6 @@ async def on_message(message):
                     pass  # البوت ليس لديه صلاحية حذف الرسائل
     
     print(f"[MSG] {message.author}: {message.content[:50]}")
-    await bot.process_commands(message)
 
 @bot.event
 async def on_command_error(ctx, error):
@@ -332,9 +351,29 @@ class HelpView(discord.ui.View):
         embed.set_footer(text="يمكنك استخدام !help مرة أخرى")
         await interaction.response.edit_message(embed=embed, view=None)
 
+# متغيرات النظام
+autodelete_enabled = {}  # {guild_id: bool}
+excluded_commands = {}   # {guild_id: [commands]}
+help_cooldown = {}       # {user_id: timestamp} - منع spam الـ help
+command_cooldown = {}    # {user_id: timestamp} - منع spam الأوامر العامة
+
 @bot.command(name="help", aliases=["مساعدة", "h"])
 async def help_command(ctx):
     """عرض قائمة الأوامر التفاعلية"""
+    import time
+    
+    # فحص الـ cooldown (5 ثواني بين كل help)
+    user_id = ctx.author.id
+    now = time.time()
+    
+    if user_id in help_cooldown:
+        if now - help_cooldown[user_id] < 5:  # 5 ثواني cooldown
+            remaining = 5 - (now - help_cooldown[user_id])
+            await ctx.send(f"⏰ انتظر {remaining:.1f} ثانية قبل استخدام الأمر مرة أخرى", delete_after=3)
+            return
+    
+    help_cooldown[user_id] = now
+    
     view = HelpView()
     embed = view.get_main_embed()
     await ctx.send(embed=embed, view=view)
