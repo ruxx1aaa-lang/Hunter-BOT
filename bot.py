@@ -61,6 +61,26 @@ async def on_ready():
 async def on_message(message):
     if message.author.bot:
         return
+    
+    # فحص إذا كانت الرسالة أمر للبوت
+    ctx = await bot.get_context(message)
+    if ctx.valid and ctx.command:
+        guild_id = message.guild.id if message.guild else None
+        
+        # تحقق من تفعيل النظام للسيرفر
+        if guild_id and autodelete_enabled.get(guild_id, True):
+            # الأوامر المستثناة للسيرفر
+            excluded = excluded_commands.get(guild_id, ['p', 'play', 'help', 'مساعدة', 'h'])
+            
+            # إذا لم يكن الأمر في قائمة الاستثناءات، احذف الرسالة
+            if ctx.command.name not in excluded:
+                try:
+                    await message.delete()
+                except discord.NotFound:
+                    pass  # الرسالة محذوفة بالفعل
+                except discord.Forbidden:
+                    pass  # البوت ليس لديه صلاحية حذف الرسائل
+    
     print(f"[MSG] {message.author}: {message.content[:50]}")
     await bot.process_commands(message)
 
@@ -77,14 +97,19 @@ class HelpView(discord.ui.View):
     def get_main_embed(self):
         embed = discord.Embed(
             title="🏹 Werjo Bot - Command Center",
-            description="**مرحباً بك في Werjo Bot!**\nاختر الفئة الي عايز تشوف أوامرها من الأزرار تحت ⬇️",
+            description="**مرحباً بك في Werjo Bot المحسن!**\nاختر الفئة الي عايز تشوف أوامرها من الأزرار تحت ⬇️",
             color=0x2B2D31
         )
         # حساب عدد السيرفرات بداية من 824
         server_count = len(bot.guilds) + 823
         embed.add_field(
             name="📊 إحصائيات البوت",
-            value=f"🌐 **السيرفرات:** {server_count}\n👥 **المستخدمين:** {len(bot.users)}\n⚡ **الأوامر:** 25+",
+            value=f"🌐 **السيرفرات:** {server_count}\n👥 **المستخدمين:** {len(bot.users)}\n⚡ **الأوامر:** 30+",
+            inline=True
+        )
+        embed.add_field(
+            name="🆕 التحديثات الجديدة",
+            value="🛡️ **حماية محسنة:** 500+ موقع محظور\n🖼️ **حماية الصور:** ضد spam الصور\n🔒 **الوضع الصارم:** حظر كل الروابط\n⏰ **Timeout تلقائي:** للمخالفين",
             inline=True
         )
         embed.add_field(
@@ -97,8 +122,18 @@ class HelpView(discord.ui.View):
             value="**werjo**\nDeveloper & Owner",
             inline=True
         )
+        embed.add_field(
+            name="🚀 المزايا الرئيسية",
+            value="• موسيقى 24/7 من SoundCloud\n• حماية متقدمة ضد الاحتيال\n• نظام ترحيب قابل للتخصيص\n• أوامر إدارة شاملة\n• تحيات وتفاعل اجتماعي",
+            inline=True
+        )
+        embed.add_field(
+            name="🔥 الجديد في هذا الإصدار",
+            value="• **Enhanced Anti-Scam:** حماية من 500+ موقع\n• **Image Spam Protection:** حماية من spam الصور\n• **Auto-Delete Commands:** حذف الأوامر تلقائياً\n• **Threat Levels:** تصنيف مستويات التهديد\n• **Auto-Timeout:** عقوبات تلقائية للمخالفين",
+            inline=True
+        )
         embed.set_thumbnail(url=bot.user.avatar.url if bot.user.avatar else None)
-        embed.set_footer(text="Werjo Bot • Developed by werjo", icon_url=bot.user.avatar.url if bot.user.avatar else None)
+        embed.set_footer(text="Werjo Bot Enhanced • Developed by werjo • v2.1", icon_url=bot.user.avatar.url if bot.user.avatar else None)
         return embed
 
     def get_music_embed(self):
@@ -132,8 +167,8 @@ class HelpView(discord.ui.View):
 
     def get_security_embed(self):
         embed = discord.Embed(
-            title="🛡️ أوامر الحماية والأمان",
-            description="**نظام حماية متطور لحماية سيرفرك**",
+            title="🛡️ أوامر الحماية والأمان المحسنة",
+            description="**نظام حماية متطور ومحسن لحماية سيرفرك**",
             color=0xED4245
         )
         embed.add_field(
@@ -142,13 +177,18 @@ class HelpView(discord.ui.View):
             inline=False
         )
         embed.add_field(
-            name="🚨 Anti-Scam Protection",
-            value="`!antiscam status` - حالة النظام\n`!antiscam toggle` - تشغيل/إيقاف\n`!antiscam whitelist add <domain>` - قائمة بيضاء\n`!antiscam test <text>` - اختبار النظام",
+            name="🚨 Enhanced Anti-Scam Protection",
+            value="`!antiscam status` - حالة النظام المحسن\n`!antiscam strict on/off` - الوضع الصارم (حظر كل الروابط)\n`!antiscam timeout on/off` - timeout تلقائي للمخالفين\n`!antiscam whitelist add <domain>` - قائمة بيضاء\n`!antiscam test <text>` - اختبار النظام",
+            inline=False
+        )
+        embed.add_field(
+            name="🖼️ Image Spam Protection (جديد!)",
+            value="`!antispam status` - حالة حماية الصور\n`!antispam test-images` - اختبار النظام\n**حماية تلقائية:** حذف 4+ صور في 30 ثانية + timeout 5 دقائق",
             inline=False
         )
         embed.add_field(
             name="🔨 Auto-Ban System",
-            value="`!hunt autoban on/off` - تشغيل/إيقاف البان التلقائي\nيبان أي عضو يغادر السيرفر تلقائياً",
+            value="`!hunt autoban on/off` - تشغيل/إيقاف البان التلقائي\nيبان أي عضو يغادر السيرفر تلقائياً مع رسالة مخصصة",
             inline=False
         )
         embed.add_field(
@@ -157,22 +197,27 @@ class HelpView(discord.ui.View):
             inline=False
         )
         embed.add_field(
-            name="🔍 المراقبة المتقدمة",
-            value="• حماية من الروابط المشبوهة والاحتيال\n• نظام ترحيب قابل للتخصيص\n• مراقبة دخول/خروج الأعضاء\n• تسجيل جميع الأنشطة",
+            name="🗑️ Auto-Delete Commands (جديد!)",
+            value="`!autodelete status` - حالة النظام\n`!autodelete toggle` - تشغيل/إيقاف\n`!autodelete exclude add <command>` - استثناء أمر\n**يحذف كل الأوامر تلقائياً ما عدا الموسيقى**",
             inline=False
         )
-        embed.set_footer(text="حماية وترحيب 24/7 لسيرفرك")
+        embed.add_field(
+            name="🔍 المراقبة المتقدمة الجديدة",
+            value="• **500+ موقع مشبوه** محظور\n• **مستويات تهديد** (منخفض/متوسط/عالي/حرج)\n• **حماية من spam الصور** تلقائياً\n• **الوضع الصارم** لحظر كل الروابط\n• **Timeout تلقائي** للمخالفين\n• تسجيل مفصل لكل الأنشطة",
+            inline=False
+        )
+        embed.set_footer(text="حماية محسنة 24/7 • 500+ موقع محظور • حماية الصور")
         return embed
 
     def get_moderation_embed(self):
         embed = discord.Embed(
             title="👮 أوامر الإدارة والتفاعل",
-            description="**أدوات إدارة قوية وتفاعل اجتماعي**",
+            description="**أدوات إدارة قوية وتفاعل اجتماعي محسن**",
             color=0xFEE75C
         )
         embed.add_field(
-            name="👋 التحيات والتفاعل",
-            value="`!greet @عضو` - تحية جميلة\n`!greet-welcome @عضو` - ترحيب بعضو جديد\n`!hug @عضو` - حضن دافي\n`!pat @عضو` - ربتة حلوة",
+            name="👋 التحيات والتفاعل الاجتماعي",
+            value="`!greet @عضو` - تحية جميلة مع معلومات العضو\n`!greet-welcome @عضو` - ترحيب خاص بالأعضاء الجدد\n`!goodbye @عضو` - وداع جميل\n`!hug @عضو` - حضن دافي مع GIF\n`!pat @عضو` - ربتة حلوة مع GIF",
             inline=False
         )
         embed.add_field(
@@ -193,6 +238,11 @@ class HelpView(discord.ui.View):
         embed.add_field(
             name="🧹 تنظيف الرسائل",
             value="`!clear <عدد>` - حذف رسائل\n`!purge <عضو> <عدد>` - حذف رسائل عضو معين",
+            inline=False
+        )
+        embed.add_field(
+            name="✨ مزايا التحيات الجديدة",
+            value="• تحيات مختلفة حسب الوقت (صباح/مساء/ويك إند)\n• صور وGIFs متحركة جميلة\n• معلومات مفصلة عن الأعضاء\n• رسائل عشوائية متنوعة\n• تفاعل عاطفي (أحضان وربتات)",
             inline=False
         )
         embed.set_footer(text="صلاحيات الإدارة مطلوبة للعقوبات • التحيات متاحة للجميع")
@@ -288,6 +338,174 @@ async def help_command(ctx):
     view = HelpView()
     embed = view.get_main_embed()
     await ctx.send(embed=embed, view=view)
+
+@bot.group(name="autodelete", aliases=["حذف-تلقائي"], invoke_without_command=True)
+@commands.has_permissions(administrator=True)
+async def autodelete(ctx):
+    """إدارة نظام الحذف التلقائي للأوامر"""
+    embed = discord.Embed(
+        title="🗑️ Auto-Delete Commands System",
+        description="**نظام حذف الأوامر التلقائي**",
+        color=0x2B2D31
+    )
+    embed.add_field(
+        name="📋 الأوامر المتاحة",
+        value=(
+            "`!autodelete status` - حالة النظام\n"
+            "`!autodelete toggle` - تشغيل/إيقاف النظام\n"
+            "`!autodelete exclude add <command>` - استثناء أمر من الحذف\n"
+            "`!autodelete exclude remove <command>` - إزالة استثناء\n"
+            "`!autodelete exclude list` - عرض الأوامر المستثناة"
+        ),
+        inline=False
+    )
+    embed.add_field(
+        name="ℹ️ كيف يعمل النظام",
+        value=(
+            "• يحذف تلقائياً أي أمر يُكتب للبوت\n"
+            "• يحافظ على نظافة القنوات\n"
+            "• أوامر الموسيقى مستثناة افتراضياً\n"
+            "• يمكن إضافة استثناءات مخصصة"
+        ),
+        inline=False
+    )
+    embed.add_field(
+        name="🔒 الأوامر المستثناة افتراضياً",
+        value="`!p`, `!play`, `!help`, `!مساعدة`",
+        inline=False
+    )
+    embed.set_footer(text="صلاحية Administrator مطلوبة")
+    await ctx.send(embed=embed)
+
+# متغير لحفظ حالة النظام لكل سيرفر
+autodelete_enabled = {}  # {guild_id: bool}
+excluded_commands = {}   # {guild_id: [commands]}
+
+@autodelete.command(name="status")
+@commands.has_permissions(administrator=True)
+async def autodelete_status(ctx):
+    """عرض حالة نظام الحذف التلقائي"""
+    guild_id = ctx.guild.id
+    enabled = autodelete_enabled.get(guild_id, True)  # مفعل افتراضياً
+    excluded = excluded_commands.get(guild_id, ['p', 'play', 'help', 'مساعدة', 'h'])
+    
+    embed = discord.Embed(
+        title="🗑️ حالة نظام الحذف التلقائي",
+        color=discord.Color.green() if enabled else discord.Color.red()
+    )
+    embed.add_field(
+        name="🔐 الحالة",
+        value="✅ مفعل" if enabled else "❌ معطل",
+        inline=True
+    )
+    embed.add_field(
+        name="📊 الأوامر المستثناة",
+        value=f"{len(excluded)} أمر",
+        inline=True
+    )
+    embed.add_field(
+        name="📋 قائمة الاستثناءات",
+        value=", ".join(f"`{cmd}`" for cmd in excluded) if excluded else "لا يوجد",
+        inline=False
+    )
+    
+    if enabled:
+        embed.add_field(
+            name="ℹ️ معلومات",
+            value="جميع الأوامر ستُحذف تلقائياً ما عدا المستثناة",
+            inline=False
+        )
+    
+    embed.set_footer(text="Werjo Bot Auto-Delete System")
+    await ctx.send(embed=embed)
+
+@autodelete.command(name="toggle")
+@commands.has_permissions(administrator=True)
+async def autodelete_toggle(ctx):
+    """تشغيل/إيقاف نظام الحذف التلقائي"""
+    guild_id = ctx.guild.id
+    current = autodelete_enabled.get(guild_id, True)
+    autodelete_enabled[guild_id] = not current
+    
+    status = "تم تشغيل" if not current else "تم إيقاف"
+    color = discord.Color.green() if not current else discord.Color.red()
+    
+    embed = discord.Embed(
+        title=f"🗑️ {status} نظام الحذف التلقائي",
+        description=f"نظام حذف الأوامر **{'مفعل' if not current else 'معطل'}** الآن",
+        color=color
+    )
+    
+    if not current:
+        embed.add_field(
+            name="✅ تم التفعيل",
+            value="الأوامر ستُحذف تلقائياً للحفاظ على نظافة القنوات",
+            inline=False
+        )
+    else:
+        embed.add_field(
+            name="❌ تم الإيقاف",
+            value="الأوامر لن تُحذف تلقائياً",
+            inline=False
+        )
+    
+    await ctx.send(embed=embed)
+
+@autodelete.group(name="exclude", invoke_without_command=True)
+@commands.has_permissions(administrator=True)
+async def exclude(ctx):
+    """إدارة الأوامر المستثناة من الحذف"""
+    await ctx.send("استخدم `add`, `remove`, أو `list`")
+
+@exclude.command(name="add")
+@commands.has_permissions(administrator=True)
+async def exclude_add(ctx, command_name: str):
+    """إضافة أمر لقائمة الاستثناءات"""
+    guild_id = ctx.guild.id
+    if guild_id not in excluded_commands:
+        excluded_commands[guild_id] = ['p', 'play', 'help', 'مساعدة', 'h']
+    
+    command_name = command_name.lower().replace('!', '')
+    
+    if command_name in excluded_commands[guild_id]:
+        return await ctx.send(f"❌ الأمر `{command_name}` موجود بالفعل في قائمة الاستثناءات")
+    
+    excluded_commands[guild_id].append(command_name)
+    await ctx.send(f"✅ تم إضافة الأمر `{command_name}` لقائمة الاستثناءات")
+
+@exclude.command(name="remove")
+@commands.has_permissions(administrator=True)
+async def exclude_remove(ctx, command_name: str):
+    """حذف أمر من قائمة الاستثناءات"""
+    guild_id = ctx.guild.id
+    if guild_id not in excluded_commands:
+        return await ctx.send("❌ لا توجد أوامر مستثناة")
+    
+    command_name = command_name.lower().replace('!', '')
+    
+    if command_name not in excluded_commands[guild_id]:
+        return await ctx.send(f"❌ الأمر `{command_name}` غير موجود في قائمة الاستثناءات")
+    
+    excluded_commands[guild_id].remove(command_name)
+    await ctx.send(f"✅ تم حذف الأمر `{command_name}` من قائمة الاستثناءات")
+
+@exclude.command(name="list")
+@commands.has_permissions(administrator=True)
+async def exclude_list(ctx):
+    """عرض قائمة الأوامر المستثناة"""
+    guild_id = ctx.guild.id
+    excluded = excluded_commands.get(guild_id, ['p', 'play', 'help', 'مساعدة', 'h'])
+    
+    if not excluded:
+        return await ctx.send("📭 لا توجد أوامر مستثناة")
+    
+    embed = discord.Embed(
+        title="📋 الأوامر المستثناة من الحذف",
+        description="\n".join(f"• `{cmd}`" for cmd in excluded),
+        color=discord.Color.blue()
+    )
+    embed.set_footer(text=f"إجمالي: {len(excluded)} أمر")
+    await ctx.send(embed=embed)
 
 @bot.event
 async def on_command(ctx):
