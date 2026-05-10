@@ -62,16 +62,18 @@ async def on_message(message):
     if message.author.bot:
         return
     
-    # فحص الـ cooldown العام للأوامر (منع spam)
+    print(f"[MSG] {message.author}: {message.content[:50]}")
+    
+    # معالجة الأوامر مع حماية من التكرار
     ctx = await bot.get_context(message)
     if ctx.valid and ctx.command:
         import time
         user_id = message.author.id
         now = time.time()
         
-        # cooldown عام للأوامر (2 ثانية)
+        # منع spam الأوامر
         if user_id in command_cooldown:
-            if now - command_cooldown[user_id] < 2:  # 2 ثانية cooldown
+            if now - command_cooldown[user_id] < 1:  # ثانية واحدة cooldown
                 try:
                     await message.delete()
                 except:
@@ -79,29 +81,24 @@ async def on_message(message):
                 return
         
         command_cooldown[user_id] = now
-    
-    # معالجة الأوامر أولاً
-    await bot.process_commands(message)
-    
-    # بعدين فحص إذا كانت الرسالة أمر للبوت للحذف
-    if ctx.valid and ctx.command:
-        guild_id = message.guild.id if message.guild else None
         
-        # تحقق من تفعيل النظام للسيرفر
+        # معالجة الأمر مرة واحدة فقط
+        await bot.process_commands(message)
+        
+        # حذف الأمر إذا مطلوب
+        guild_id = message.guild.id if message.guild else None
         if guild_id and autodelete_enabled.get(guild_id, True):
-            # الأوامر المستثناة للسيرفر
             excluded = excluded_commands.get(guild_id, ['p', 'play', 'help', 'مساعدة', 'h'])
             
-            # إذا لم يكن الأمر في قائمة الاستثناءات، احذف الرسالة
             if ctx.command.name not in excluded and not any(alias in excluded for alias in ctx.command.aliases):
                 try:
+                    await asyncio.sleep(0.5)  # انتظار قصير قبل الحذف
                     await message.delete()
-                except discord.NotFound:
-                    pass  # الرسالة محذوفة بالفعل
-                except discord.Forbidden:
-                    pass  # البوت ليس لديه صلاحية حذف الرسائل
-    
-    print(f"[MSG] {message.author}: {message.content[:50]}")
+                except:
+                    pass
+    else:
+        # إذا مش أمر، معالج عادي
+        await bot.process_commands(message)
 
 @bot.event
 async def on_command_error(ctx, error):
@@ -112,6 +109,23 @@ class HelpView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=300)
         self.current_page = "main"
+        self._interaction_lock = False  # منع التفاعلات المتعددة
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        """فحص التفاعلات لمنع الـ spam"""
+        if self._interaction_lock:
+            await interaction.response.send_message("⏰ انتظر قليلاً...", ephemeral=True)
+            return False
+        
+        self._interaction_lock = True
+        # إلغاء القفل بعد ثانية واحدة
+        asyncio.create_task(self._unlock_after_delay())
+        return True
+    
+    async def _unlock_after_delay(self):
+        """إلغاء قفل التفاعل بعد تأخير"""
+        await asyncio.sleep(1)
+        self._interaction_lock = False
 
     def get_main_embed(self):
         embed = discord.Embed(
@@ -362,21 +376,33 @@ async def help_command(ctx):
     """عرض قائمة الأوامر التفاعلية"""
     import time
     
-    # فحص الـ cooldown (5 ثواني بين كل help)
+    # فحص الـ cooldown (10 ثواني بين كل help)
     user_id = ctx.author.id
     now = time.time()
     
     if user_id in help_cooldown:
-        if now - help_cooldown[user_id] < 5:  # 5 ثواني cooldown
-            remaining = 5 - (now - help_cooldown[user_id])
-            await ctx.send(f"⏰ انتظر {remaining:.1f} ثانية قبل استخدام الأمر مرة أخرى", delete_after=3)
+        if now - help_cooldown[user_id] < 10:  # 10 ثواني cooldown
+            remaining = 10 - (now - help_cooldown[user_id])
+            embed = discord.Embed(
+                title="⏰ Cooldown Active",
+                description=f"انتظر **{remaining:.1f} ثانية** قبل استخدام الأمر مرة أخرى",
+                color=discord.Color.orange()
+            )
+            embed.set_footer(text="لمنع spam الأوامر")
+            await ctx.send(embed=embed, delete_after=5)
             return
     
     help_cooldown[user_id] = now
     
-    view = HelpView()
-    embed = view.get_main_embed()
-    await ctx.send(embed=embed, view=view)
+    # التأكد من عدم وجود رد سابق
+    try:
+        view = HelpView()
+        embed = view.get_main_embed()
+        await ctx.send(embed=embed, view=view)
+    except Exception as e:
+        print(f"[HELP ERROR] {e}")
+        # رد بسيط في حالة الخطأ
+        await ctx.send("❌ حدث خطأ في عرض القائمة، جرب مرة أخرى")
 
 @bot.group(name="autodelete", aliases=["حذف-تلقائي"], invoke_without_command=True)
 @commands.has_permissions(administrator=True)
@@ -546,15 +572,58 @@ async def exclude_list(ctx):
     embed.set_footer(text=f"إجمالي: {len(excluded)} أمر")
     await ctx.send(embed=embed)
 
+@bot.command(name="restart", aliases=["إعادة-تشغيل"])
+@commands.is_owner()
+async def restart_bot(ctx):
+    """إعادة تشغيل البوت (للمطور فقط)"""
+    embed = discord.Embed(
+        title="🔄 إعادة تشغيل البوت",
+        description="جاري إعادة تشغيل البوت...",
+        color=discord.Color.orange()
+    )
+    await ctx.send(embed=embed)
+    
+    # مسح الـ cooldowns
+    help_cooldown.clear()
+    command_cooldown.clear()
+    
+    print("[RESTART] Bot restarting...")
+    await bot.close()
+
+@bot.command(name="clear-cooldowns", aliases=["مسح-كولداون"])
+@commands.has_permissions(administrator=True)
+async def clear_cooldowns(ctx):
+    """مسح جميع الـ cooldowns"""
+    help_cooldown.clear()
+    command_cooldown.clear()
+    
+    embed = discord.Embed(
+        title="✅ تم مسح الـ Cooldowns",
+        description="تم مسح جميع cooldowns الأوامر والـ help",
+        color=discord.Color.green()
+    )
+    await ctx.send(embed=embed)
+
 @bot.event
 async def on_command(ctx):
     print(f"[CMD] {ctx.author} used: {ctx.message.content[:50]}")
 
 async def load_cogs():
     cogs = ["cogs.logging", "cogs.antispam", "cogs.antiraid", "cogs.moderation", "cogs.stats", "cogs.music", "cogs.antiscam", "cogs.welcome", "cogs.greetings"]
+    loaded_cogs = []
+    
     for cog in cogs:
-        await bot.load_extension(cog)
-        print(f"  ✔ Loaded {cog}")
+        try:
+            if cog not in bot.extensions:  # تحقق من عدم تحميل الـ cog مسبقاً
+                await bot.load_extension(cog)
+                loaded_cogs.append(cog)
+                print(f"  ✔ Loaded {cog}")
+            else:
+                print(f"  ⚠ {cog} already loaded, skipping")
+        except Exception as e:
+            print(f"  ❌ Failed to load {cog}: {e}")
+    
+    print(f"📦 Successfully loaded {len(loaded_cogs)} cogs")
 
 async def main():
     async with bot:
