@@ -142,7 +142,7 @@ class HelpView(discord.ui.View):
         )
         embed.add_field(
             name="🆕 التحديثات الجديدة",
-            value="🛡️ **حماية محسنة:** 500+ موقع محظور\n🖼️ **حماية الصور:** ضد spam الصور\n🔒 **الوضع الصارم:** حظر كل الروابط\n⏰ **Timeout تلقائي:** للمخالفين\n📋 **What You Missed:** تتبع الأنشطة",
+            value="🛡️ **حماية محسنة:** 500+ موقع محظور\n🖼️ **حماية الصور:** ضد spam الصور\n🔒 **الوضع الصارم:** حظر كل الروابط\n⏰ **Timeout تلقائي:** للمخالفين\n👋 **تحيات محسنة:** تفاعل اجتماعي أفضل",
             inline=True
         )
         embed.add_field(
@@ -162,7 +162,7 @@ class HelpView(discord.ui.View):
         )
         embed.add_field(
             name="🔥 الجديد في هذا الإصدار",
-            value="• **Enhanced Anti-Scam:** حماية من 500+ موقع\n• **Image Spam Protection:** حماية من spam الصور\n• **Auto-Delete Commands:** حذف الأوامر تلقائياً\n• **Threat Levels:** تصنيف مستويات التهديد\n• **Auto-Timeout:** عقوبات تلقائية للمخالفين\n• **What You Missed:** تتبع الأنشطة المفقودة",
+            value="• **Enhanced Anti-Scam:** حماية من 500+ موقع\n• **Image Spam Protection:** حماية من spam الصور\n• **Auto-Delete Commands:** حذف الأوامر تلقائياً\n• **Threat Levels:** تصنيف مستويات التهديد\n• **Auto-Timeout:** عقوبات تلقائية للمخالفين\n• **Enhanced Greetings:** تحيات محسنة ومتنوعة",
             inline=True
         )
         embed.set_thumbnail(url=bot.user.avatar.url if bot.user.avatar else None)
@@ -288,16 +288,6 @@ class HelpView(discord.ui.View):
             color=0x57F287
         )
         embed.add_field(
-            name="📋 What You Missed (تلقائي!)",
-            value="`تلقائي في Voice Channels` - يظهر عند دخول أي Voice Channel\n`!missed` - عرض الأنشطة يدوياً\n`!recent` - آخر الأنشطة بشكل سريع\n**يُظهر تلقائياً:** الانضمامات، المغادرات، الرسائل المهمة، الأنشطة الصوتية، الألعاب",
-            inline=False
-        )
-        embed.add_field(
-            name="👻 Voice Ghost (جديد!)",
-            value="`تلقائي في Voice Channels` - يظهر 'User was here' عند مغادرة Voice Channel\n`!voiceghost status` - حالة النظام\n`!voiceghost toggle` - تشغيل/إيقاف\n`!voiceghost format <message>` - تخصيص الرسالة\n**يُظهر تلقائياً:** من كان موجود في الـ voice مؤخراً",
-            inline=False
-        )
-        embed.add_field(
             name="📈 إحصائيات السيرفر",
             value="`!serverinfo` - معلومات السيرفر\n`!membercount` - عدد الأعضاء\n`!channelcount` - عدد القنوات\n`!rolecount` - عدد الأدوار",
             inline=False
@@ -313,21 +303,16 @@ class HelpView(discord.ui.View):
             inline=False
         )
         embed.add_field(
-            name="⚙️ إدارة تتبع الأنشطة (للإداريين)",
-            value="`!activity status` - حالة النظام\n`!activity notifications on/off` - تشغيل/إيقاف الإشعارات التلقائية\n`!activity cleanup` - تنظيف الأنشطة القديمة\n`!activity stats` - إحصائيات النظام",
+            name="⚙️ إدارة البوت (للإداريين)",
+            value="`!botinfo` - معلومات البوت\n`!ping` - سرعة الاستجابة\n`!uptime` - مدة التشغيل",
             inline=False
         )
         embed.add_field(
-            name="✨ مزايا تتبع الأنشطة",
-            value="• **إشعارات تلقائية** عند دخول Voice Channels\n• تتبع تلقائي لجميع الأنشطة المهمة\n• عرض مخصص حسب آخر زيارة\n• تجميع ذكي للأنشطة المتشابهة\n• تنظيف تلقائي للبيانات القديمة\n• واجهة جميلة وسهلة القراءة",
+            name="✨ المزايا الرئيسية",
+            value="• موسيقى 24/7 من SoundCloud\n• حماية متقدمة ضد الاحتيال\n• نظام ترحيب قابل للتخصيص\n• أوامر إدارة شاملة\n• تحيات وتفاعل اجتماعي\n• إحصائيات مفصلة للسيرفر",
             inline=False
         )
-        embed.add_field(
-            name="👻 مزايا Voice Ghost",
-            value="• **عرض تلقائي** لمن غادر Voice Channel مؤخراً\n• رسائل قابلة للتخصيص\n• اختفاء تلقائي عند العودة\n• تنظيف تلقائي بعد 30 دقيقة\n• يساعد في معرفة النشاط الصوتي\n• تصميم أنيق ومتناسق مع Discord",
-            inline=False
-        )
-        embed.set_footer(text="إحصائيات محدثة لحظياً • تتبع الأنشطة 24/7")
+        embed.set_footer(text="إحصائيات محدثة لحظياً • البوت متاح 24/7")
         return embed
 
     @discord.ui.button(label="🎵 موسيقى", style=discord.ButtonStyle.primary, row=0)
@@ -634,7 +619,7 @@ async def on_command(ctx):
     print(f"[CMD] {ctx.author} used: {ctx.message.content[:50]}")
 
 async def load_cogs():
-    cogs = ["cogs.logging", "cogs.antispam", "cogs.antiraid", "cogs.moderation", "cogs.stats", "cogs.music", "cogs.antiscam", "cogs.welcome", "cogs.greetings", "cogs.activity_tracker", "cogs.voice_presence"]
+    cogs = ["cogs.logging", "cogs.antispam", "cogs.antiraid", "cogs.moderation", "cogs.stats", "cogs.music", "cogs.antiscam", "cogs.welcome", "cogs.greetings"]
     loaded_cogs = []
     
     for cog in cogs:
