@@ -142,7 +142,7 @@ class HelpView(discord.ui.View):
         )
         embed.add_field(
             name="🆕 التحديثات الجديدة",
-            value="🛡️ **حماية محسنة:** 500+ موقع محظور\n🖼️ **حماية الصور:** ضد spam الصور\n🔒 **الوضع الصارم:** حظر كل الروابط\n⏰ **Timeout تلقائي:** للمخالفين",
+            value="🛡️ **حماية محسنة:** 500+ موقع محظور\n🖼️ **حماية الصور:** ضد spam الصور\n🔒 **الوضع الصارم:** حظر كل الروابط\n⏰ **Timeout تلقائي:** للمخالفين\n📋 **What You Missed:** تتبع الأنشطة",
             inline=True
         )
         embed.add_field(
@@ -157,16 +157,16 @@ class HelpView(discord.ui.View):
         )
         embed.add_field(
             name="🚀 المزايا الرئيسية",
-            value="• موسيقى 24/7 من SoundCloud\n• حماية متقدمة ضد الاحتيال\n• نظام ترحيب قابل للتخصيص\n• أوامر إدارة شاملة\n• تحيات وتفاعل اجتماعي",
+            value="• موسيقى 24/7 من SoundCloud\n• حماية متقدمة ضد الاحتيال\n• نظام ترحيب قابل للتخصيص\n• أوامر إدارة شاملة\n• تحيات وتفاعل اجتماعي\n• تتبع الأنشطة المفقودة",
             inline=True
         )
         embed.add_field(
             name="🔥 الجديد في هذا الإصدار",
-            value="• **Enhanced Anti-Scam:** حماية من 500+ موقع\n• **Image Spam Protection:** حماية من spam الصور\n• **Auto-Delete Commands:** حذف الأوامر تلقائياً\n• **Threat Levels:** تصنيف مستويات التهديد\n• **Auto-Timeout:** عقوبات تلقائية للمخالفين",
+            value="• **Enhanced Anti-Scam:** حماية من 500+ موقع\n• **Image Spam Protection:** حماية من spam الصور\n• **Auto-Delete Commands:** حذف الأوامر تلقائياً\n• **Threat Levels:** تصنيف مستويات التهديد\n• **Auto-Timeout:** عقوبات تلقائية للمخالفين\n• **What You Missed:** تتبع الأنشطة المفقودة",
             inline=True
         )
         embed.set_thumbnail(url=bot.user.avatar.url if bot.user.avatar else None)
-        embed.set_footer(text="Werjo Bot Enhanced • Developed by werjo • v2.1", icon_url=bot.user.avatar.url if bot.user.avatar else None)
+        embed.set_footer(text="Werjo Bot Enhanced • Developed by werjo • v2.2", icon_url=bot.user.avatar.url if bot.user.avatar else None)
         return embed
 
     def get_music_embed(self):
@@ -283,9 +283,14 @@ class HelpView(discord.ui.View):
 
     def get_stats_embed(self):
         embed = discord.Embed(
-            title="📊 أوامر الإحصائيات",
-            description="**معلومات وإحصائيات مفصلة**",
+            title="📊 أوامر الإحصائيات والأنشطة",
+            description="**معلومات وإحصائيات مفصلة + تتبع الأنشطة**",
             color=0x57F287
+        )
+        embed.add_field(
+            name="📋 What You Missed (جديد!)",
+            value="`!missed` - عرض الأنشطة التي فاتتك\n`!missed <ساعات>` - تخصيص الفترة الزمنية\n`!فاتني` - الأمر بالعربية\n`!recent` - آخر الأنشطة بشكل سريع\n**يُظهر:** الانضمامات، المغادرات، الرسائل المهمة، الأنشطة الصوتية، الألعاب",
+            inline=False
         )
         embed.add_field(
             name="📈 إحصائيات السيرفر",
@@ -302,7 +307,17 @@ class HelpView(discord.ui.View):
             value="`!botinfo` - معلومات البوت\n`!ping` - سرعة الاستجابة\n`!uptime` - مدة التشغيل",
             inline=False
         )
-        embed.set_footer(text="إحصائيات محدثة لحظياً")
+        embed.add_field(
+            name="⚙️ إدارة تتبع الأنشطة (للإداريين)",
+            value="`!activity status` - حالة النظام\n`!activity cleanup` - تنظيف الأنشطة القديمة\n`!activity stats` - إحصائيات النظام",
+            inline=False
+        )
+        embed.add_field(
+            name="✨ مزايا تتبع الأنشطة",
+            value="• تتبع تلقائي لجميع الأنشطة المهمة\n• عرض مخصص حسب آخر زيارة\n• تجميع ذكي للأنشطة المتشابهة\n• تنظيف تلقائي للبيانات القديمة\n• واجهة جميلة وسهلة القراءة",
+            inline=False
+        )
+        embed.set_footer(text="إحصائيات محدثة لحظياً • تتبع الأنشطة 24/7")
         return embed
 
     @discord.ui.button(label="🎵 موسيقى", style=discord.ButtonStyle.primary, row=0)
@@ -609,7 +624,7 @@ async def on_command(ctx):
     print(f"[CMD] {ctx.author} used: {ctx.message.content[:50]}")
 
 async def load_cogs():
-    cogs = ["cogs.logging", "cogs.antispam", "cogs.antiraid", "cogs.moderation", "cogs.stats", "cogs.music", "cogs.antiscam", "cogs.welcome", "cogs.greetings"]
+    cogs = ["cogs.logging", "cogs.antispam", "cogs.antiraid", "cogs.moderation", "cogs.stats", "cogs.music", "cogs.antiscam", "cogs.welcome", "cogs.greetings", "cogs.activity_tracker"]
     loaded_cogs = []
     
     for cog in cogs:
