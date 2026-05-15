@@ -293,6 +293,11 @@ class HelpView(discord.ui.View):
             inline=False
         )
         embed.add_field(
+            name="👻 Voice Ghost (جديد!)",
+            value="`تلقائي في Voice Channels` - يظهر 'User was here' عند مغادرة Voice Channel\n`!voiceghost status` - حالة النظام\n`!voiceghost toggle` - تشغيل/إيقاف\n`!voiceghost format <message>` - تخصيص الرسالة\n**يُظهر تلقائياً:** من كان موجود في الـ voice مؤخراً",
+            inline=False
+        )
+        embed.add_field(
             name="📈 إحصائيات السيرفر",
             value="`!serverinfo` - معلومات السيرفر\n`!membercount` - عدد الأعضاء\n`!channelcount` - عدد القنوات\n`!rolecount` - عدد الأدوار",
             inline=False
@@ -315,6 +320,11 @@ class HelpView(discord.ui.View):
         embed.add_field(
             name="✨ مزايا تتبع الأنشطة",
             value="• **إشعارات تلقائية** عند دخول Voice Channels\n• تتبع تلقائي لجميع الأنشطة المهمة\n• عرض مخصص حسب آخر زيارة\n• تجميع ذكي للأنشطة المتشابهة\n• تنظيف تلقائي للبيانات القديمة\n• واجهة جميلة وسهلة القراءة",
+            inline=False
+        )
+        embed.add_field(
+            name="👻 مزايا Voice Ghost",
+            value="• **عرض تلقائي** لمن غادر Voice Channel مؤخراً\n• رسائل قابلة للتخصيص\n• اختفاء تلقائي عند العودة\n• تنظيف تلقائي بعد 30 دقيقة\n• يساعد في معرفة النشاط الصوتي\n• تصميم أنيق ومتناسق مع Discord",
             inline=False
         )
         embed.set_footer(text="إحصائيات محدثة لحظياً • تتبع الأنشطة 24/7")
@@ -624,7 +634,7 @@ async def on_command(ctx):
     print(f"[CMD] {ctx.author} used: {ctx.message.content[:50]}")
 
 async def load_cogs():
-    cogs = ["cogs.logging", "cogs.antispam", "cogs.antiraid", "cogs.moderation", "cogs.stats", "cogs.music", "cogs.antiscam", "cogs.welcome", "cogs.greetings", "cogs.activity_tracker"]
+    cogs = ["cogs.logging", "cogs.antispam", "cogs.antiraid", "cogs.moderation", "cogs.stats", "cogs.music", "cogs.antiscam", "cogs.welcome", "cogs.greetings", "cogs.activity_tracker", "cogs.voice_presence"]
     loaded_cogs = []
     
     for cog in cogs:
