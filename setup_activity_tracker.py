@@ -61,7 +61,10 @@ async def setup_activity_tracker():
                 track_voice BOOLEAN DEFAULT 1,
                 track_games BOOLEAN DEFAULT 1,
                 max_activities INTEGER DEFAULT 50,
-                activity_hours INTEGER DEFAULT 24
+                activity_hours INTEGER DEFAULT 24,
+                auto_notifications BOOLEAN DEFAULT 1,
+                notification_cooldown INTEGER DEFAULT 30,
+                min_activities_for_notification INTEGER DEFAULT 3
             )
         """)
         print("  ✅ جدول activity_settings")
@@ -90,12 +93,19 @@ async def setup_activity_tracker():
     print("\n📋 ملخص الإعداد:")
     print("  • تم إنشاء 3 جداول جديدة")
     print("  • تم إنشاء فهارس لتحسين الأداء")
+    print("  • تم تفعيل الإشعارات التلقائية")
     print("  • النظام جاهز للاستخدام")
     
+    print("\n🎤 الاستخدام التلقائي:")
+    print("  • ادخل أي Voice Channel للحصول على إشعار تلقائي")
+    print("  • الإشعارات تُحذف تلقائياً بعد دقيقة")
+    print("  • Cooldown 30 دقيقة بين كل إشعار")
+    
     print("\n🎮 الأوامر المتاحة:")
-    print("  • !missed - عرض الأنشطة المفقودة")
+    print("  • تلقائي - ادخل Voice Channel فقط!")
+    print("  • !missed - عرض الأنشطة المفقودة يدوياً")
     print("  • !recent - آخر الأنشطة")
-    print("  • !activity status - حالة النظام (للإداريين)")
+    print("  • !activity notifications - إعدادات الإشعارات (للإداريين)")
     
     print("\n✅ تم إكمال الإعداد بنجاح!")
 

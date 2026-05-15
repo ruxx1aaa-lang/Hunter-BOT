@@ -288,8 +288,8 @@ class HelpView(discord.ui.View):
             color=0x57F287
         )
         embed.add_field(
-            name="📋 What You Missed (جديد!)",
-            value="`!missed` - عرض الأنشطة التي فاتتك\n`!missed <ساعات>` - تخصيص الفترة الزمنية\n`!فاتني` - الأمر بالعربية\n`!recent` - آخر الأنشطة بشكل سريع\n**يُظهر:** الانضمامات، المغادرات، الرسائل المهمة، الأنشطة الصوتية، الألعاب",
+            name="📋 What You Missed (تلقائي!)",
+            value="`تلقائي في Voice Channels` - يظهر عند دخول أي Voice Channel\n`!missed` - عرض الأنشطة يدوياً\n`!recent` - آخر الأنشطة بشكل سريع\n**يُظهر تلقائياً:** الانضمامات، المغادرات، الرسائل المهمة، الأنشطة الصوتية، الألعاب",
             inline=False
         )
         embed.add_field(
@@ -309,12 +309,12 @@ class HelpView(discord.ui.View):
         )
         embed.add_field(
             name="⚙️ إدارة تتبع الأنشطة (للإداريين)",
-            value="`!activity status` - حالة النظام\n`!activity cleanup` - تنظيف الأنشطة القديمة\n`!activity stats` - إحصائيات النظام",
+            value="`!activity status` - حالة النظام\n`!activity notifications on/off` - تشغيل/إيقاف الإشعارات التلقائية\n`!activity cleanup` - تنظيف الأنشطة القديمة\n`!activity stats` - إحصائيات النظام",
             inline=False
         )
         embed.add_field(
             name="✨ مزايا تتبع الأنشطة",
-            value="• تتبع تلقائي لجميع الأنشطة المهمة\n• عرض مخصص حسب آخر زيارة\n• تجميع ذكي للأنشطة المتشابهة\n• تنظيف تلقائي للبيانات القديمة\n• واجهة جميلة وسهلة القراءة",
+            value="• **إشعارات تلقائية** عند دخول Voice Channels\n• تتبع تلقائي لجميع الأنشطة المهمة\n• عرض مخصص حسب آخر زيارة\n• تجميع ذكي للأنشطة المتشابهة\n• تنظيف تلقائي للبيانات القديمة\n• واجهة جميلة وسهلة القراءة",
             inline=False
         )
         embed.set_footer(text="إحصائيات محدثة لحظياً • تتبع الأنشطة 24/7")

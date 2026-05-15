@@ -43,86 +43,65 @@ class MissedActivitiesView(discord.ui.View):
         self.page_button.label = f"صفحة {self.current_page + 1}/{total_pages}"
     
     def get_summary_embed(self):
-        """الحصول على embed الملخص الرئيسي"""
+        """الحصول على embed الملخص الرئيسي بنفس شكل الصورة"""
         if not self.activities:
             embed = discord.Embed(
-                title="📭 لا توجد أنشطة جديدة",
-                description=f"لم تفتك أي أنشطة منذ آخر زيارة لك",
-                color=discord.Color.blue()
+                title="What You Missed",
+                description="No recent activities",
+                color=0x36393F
             )
-            embed.set_footer(text=f"آخر نشاط: {self.since_time.strftime('%Y-%m-%d %H:%M')}")
+            embed.set_footer(text=f"Last seen: {self.since_time.strftime('%Y-%m-%d %H:%M')}")
             return embed
         
         embed = discord.Embed(
-            title="📋 What You Missed - ملخص",
-            description=f"الأنشطة منذ آخر زيارة لك ({self.since_time.strftime('%Y-%m-%d %H:%M')})",
-            color=0x5865F2
+            title="What You Missed",
+            color=0x36393F  # لون رمادي داكن مثل Discord
         )
         
-        # عرض الانضمامات
-        if self.activity_groups["join"]:
-            joins = self.activity_groups["join"][:5]
-            join_text = "\n".join([
-                f"• **{act[2]}** انضم للسيرفر" 
-                for act in joins
-            ])
-            if len(self.activity_groups["join"]) > 5:
-                join_text += f"\n... و {len(self.activity_groups['join']) - 5} آخرين"
-            embed.add_field(name="👋 انضمامات جديدة", value=join_text, inline=False)
+        # عرض الأنشطة بنفس تنسيق الصورة
+        activity_text = ""
         
-        # عرض المغادرات
-        if self.activity_groups["leave"]:
-            leaves = self.activity_groups["leave"][:5]
-            leave_text = "\n".join([
-                f"• **{act[2]}** غادر السيرفر" 
-                for act in leaves
-            ])
-            if len(self.activity_groups["leave"]) > 5:
-                leave_text += f"\n... و {len(self.activity_groups['leave']) - 5} آخرين"
-            embed.add_field(name="👋 مغادرات", value=leave_text, inline=False)
+        # ترتيب الأنشطة حسب الوقت (الأحدث أولاً)
+        sorted_activities = sorted(self.activities, key=lambda x: x[5], reverse=True)
         
-        # عرض الرسائل المهمة
-        if self.activity_groups["message"]:
-            messages = self.activity_groups["message"][:3]
-            msg_text = "\n".join([
-                f"• **{act[2]}** {act[3]}" 
-                for act in messages
-            ])
-            if len(self.activity_groups["message"]) > 3:
-                msg_text += f"\n... و {len(self.activity_groups['message']) - 3} رسائل أخرى"
-            embed.add_field(name="💬 رسائل مهمة", value=msg_text, inline=False)
+        for activity in sorted_activities[:15]:  # أول 15 نشاط
+            activity_type, user_id, username, description, channel_id, timestamp, data = activity
+            activity_time = datetime.fromisoformat(timestamp)
+            
+            # حساب الوقت المنقضي
+            time_diff = datetime.now() - activity_time
+            
+            if time_diff.days > 0:
+                time_str = f"{time_diff.days}d ago"
+            elif time_diff.seconds > 3600:
+                hours = time_diff.seconds // 3600
+                time_str = f"{hours}h ago"
+            elif time_diff.seconds > 60:
+                minutes = time_diff.seconds // 60
+                time_str = f"{minutes}m ago"
+            else:
+                time_str = "now"
+            
+            # تحديد النص حسب نوع النشاط
+            if activity_type == "voice_join":
+                activity_text += f"🟢 **{username}** was here\n{time_str}\n\n"
+            elif activity_type == "voice_leave":
+                activity_text += f"🔴 **{username}** left voice\n{time_str}\n\n"
+            elif activity_type == "join":
+                activity_text += f"👋 **{username}** joined server\n{time_str}\n\n"
+            elif activity_type == "leave":
+                activity_text += f"👋 **{username}** left server\n{time_str}\n\n"
+            elif activity_type == "message":
+                activity_text += f"💬 **{username}** sent message\n{time_str}\n\n"
+            elif activity_type == "game_start":
+                activity_text += f"🎮 **{username}** started playing\n{time_str}\n\n"
         
-        # عرض أنشطة الصوت
-        voice_activities = self.activity_groups["voice_join"] + self.activity_groups["voice_leave"]
-        if voice_activities:
-            voice_text = "\n".join([
-                f"• **{act[2]}** {act[3]}" 
-                for act in voice_activities[:3]
-            ])
-            if len(voice_activities) > 3:
-                voice_text += f"\n... و {len(voice_activities) - 3} أنشطة أخرى"
-            embed.add_field(name="🔊 أنشطة صوتية", value=voice_text, inline=False)
+        if activity_text:
+            embed.description = activity_text
+        else:
+            embed.description = "No recent activities"
         
-        # عرض الألعاب
-        if self.activity_groups["game_start"]:
-            games = self.activity_groups["game_start"][:3]
-            game_text = "\n".join([
-                f"• **{act[2]}** {act[3]}" 
-                for act in games
-            ])
-            if len(self.activity_groups["game_start"]) > 3:
-                game_text += f"\n... و {len(self.activity_groups['game_start']) - 3} ألعاب أخرى"
-            embed.add_field(name="🎮 ألعاب جديدة", value=game_text, inline=False)
-        
-        # إحصائيات
-        total_activities = len(self.activities)
-        embed.add_field(
-            name="📊 الإحصائيات",
-            value=f"إجمالي الأنشطة: **{total_activities}**\nاستخدم الأزرار للتفاصيل",
-            inline=True
-        )
-        
-        embed.set_footer(text="استخدم الأزرار أدناه للتنقل والتفاصيل")
+        embed.set_footer(text="Use buttons below for more details")
         return embed
     
     def get_detailed_embed(self):
@@ -167,20 +146,20 @@ class MissedActivitiesView(discord.ui.View):
         
         return embed
     
-    @discord.ui.button(label="📋 ملخص", style=discord.ButtonStyle.primary, row=0)
+    @discord.ui.button(label="📋 Summary", style=discord.ButtonStyle.primary, row=0)
     async def summary_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         """عرض الملخص الرئيسي"""
         if interaction.user.id != self.user_id:
-            return await interaction.response.send_message("❌ هذا الأمر خاص بك فقط", ephemeral=True)
+            return await interaction.response.send_message("❌ This command is for you only", ephemeral=True)
         
         embed = self.get_summary_embed()
         await interaction.response.edit_message(embed=embed, view=self)
     
-    @discord.ui.button(label="📝 تفاصيل", style=discord.ButtonStyle.secondary, row=0)
+    @discord.ui.button(label="📝 Details", style=discord.ButtonStyle.secondary, row=0)
     async def details_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         """عرض التفاصيل مع التنقل"""
         if interaction.user.id != self.user_id:
-            return await interaction.response.send_message("❌ هذا الأمر خاص بك فقط", ephemeral=True)
+            return await interaction.response.send_message("❌ This command is for you only", ephemeral=True)
         
         embed = self.get_detailed_embed()
         await interaction.response.edit_message(embed=embed, view=self)
@@ -219,11 +198,11 @@ class MissedActivitiesView(discord.ui.View):
         else:
             await interaction.response.defer()
     
-    @discord.ui.button(label="🔄 تحديث", style=discord.ButtonStyle.success, row=2)
+    @discord.ui.button(label="🔄 Refresh", style=discord.ButtonStyle.success, row=2)
     async def refresh_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         """تحديث البيانات"""
         if interaction.user.id != self.user_id:
-            return await interaction.response.send_message("❌ هذا الأمر خاص بك فقط", ephemeral=True)
+            return await interaction.response.send_message("❌ This command is for you only", ephemeral=True)
         
         # إعادة تحميل البيانات
         from cogs.activity_tracker import ActivityTracker
@@ -254,18 +233,18 @@ class MissedActivitiesView(discord.ui.View):
         embed = self.get_summary_embed()
         await interaction.response.edit_message(embed=embed, view=self)
     
-    @discord.ui.button(label="❌ إغلاق", style=discord.ButtonStyle.danger, row=2)
+    @discord.ui.button(label="❌ Close", style=discord.ButtonStyle.danger, row=2)
     async def close_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         """إغلاق الواجهة"""
         if interaction.user.id != self.user_id:
-            return await interaction.response.send_message("❌ هذا الأمر خاص بك فقط", ephemeral=True)
+            return await interaction.response.send_message("❌ This command is for you only", ephemeral=True)
         
         embed = discord.Embed(
-            title="✅ تم إغلاق What You Missed",
-            description="شكراً لاستخدام نظام تتبع الأنشطة!",
+            title="✅ What You Missed Closed",
+            description="Thanks for using the activity tracker!",
             color=discord.Color.green()
         )
-        embed.set_footer(text="يمكنك استخدام !missed مرة أخرى")
+        embed.set_footer(text="You can use !missed again anytime")
         await interaction.response.edit_message(embed=embed, view=None)
 
 async def setup(bot):
